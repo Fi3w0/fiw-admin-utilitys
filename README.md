@@ -25,6 +25,8 @@ Fiw Admin Tools gives server owners a focused `/fiw` command suite without requi
 - **Full punishment toolkit** — kick, temp/permanent ban and mute, punishment history, and an admin-editable escalation ladder for repeat offenders.
 - **Player reports and AFK detection** — a player-facing `/report` command with staff notification, and configurable AFK tagging/auto-kick.
 - **Freeze+** — reason, auto-unfreeze, evidence snapshot, and teleport-to-frozen-player on top of the existing persistent freeze.
+- **Crash/hang watchdog** — alerts (log + Discord) if the server stops ticking, and flags on next boot when the last shutdown wasn't clean.
+- **Heuristic dupe detection** — a per-player and per-chunk item-value rate detector plus a duplicate-item-signature detector, alert-only by default with an admin-configurable escalation tier per detector.
 - **Better server presence** — custom join/leave messages, rotating MOTDs, announcements, and first-join alerts in game or through Discord.
 - **Live JSON configuration** — each module can be enabled independently and reloaded with `/fiw reload`.
 
@@ -76,6 +78,14 @@ Kick, temp-ban/ban, and temp-mute/mute with optional reasons, all logged to a pe
 
 Players can flag problems with `/report <player> <reason>` (cooldown-limited); online staff are notified in-chat and optionally on Discord, and can claim/resolve reports with `/fiw reports`. AFK detection tags idle players in the tab list, optionally broadcasts state changes, and can auto-kick after a configurable idle period; players can also self-mark with `/fiw afk`.
 
+### Watchdog
+
+A background heartbeat monitor alerts (log + optional Discord) if the server stops ticking for longer than a configurable threshold — a possible hang, well ahead of Minecraft's own ~60s watchdog kill. Separately, on boot the mod checks whether the previous session shut down cleanly; if it didn't (crash, kill, power loss), it raises an alert. Alerts never use in-game chat, since a hang can mean the server thread itself is stuck.
+
+### Dupe detection
+
+A heuristic, poll-based (not event-based) rule engine scans online players' inventories every few seconds rather than hooking every pickup/craft/container action. Two independent detectors: a **rate detector** flags a player (or, optionally, a chunk) gaining more weighted value from an admin-configured item watch list than a configured threshold within a time window — with an exemption while a container is open, to avoid flagging normal looting — and a **signature detector** flags the same specific item (by NBT/component fingerprint) appearing to be held by two different players within the same scan window. Both detectors default to alert-only; each can be escalated independently to auto-freeze, kick, temp-ban, or ban once an admin trusts it. A short grace period after boot/reload avoids false positives while player inventories are first observed. `/fiw dupe alerts` reviews flags; `/fiw dupe clear <player>` resets a false positive.
+
 ### Messages and first joins
 
 Replace vanilla join/leave text, rotate MOTDs, schedule announcements, and notify staff when a player joins for the first time. Message colors, prefixes, intervals, randomization, and Discord delivery are configurable.
@@ -95,6 +105,8 @@ Replace vanilla join/leave text, rotate MOTDs, schedule announcements, and notif
 | Punishment | `/fiw kick <player> [reason]`, `/fiw ban <player> [reason]`, `/fiw tempban <player> <duration> [reason]`, `/fiw unban <player>`, `/fiw mute <player> [reason]`, `/fiw tempmute <player> <duration> [reason]`, `/fiw unmute <player>`, `/fiw punish <player> [reason]`, `/fiw history <player>` |
 | Reports | `/report <player> <reason>`, `/fiw reports`, `/fiw reports claim <id>`, `/fiw reports resolve <id>` |
 | AFK | `/fiw afk`, `/fiw afk list` |
+| Watchdog | `/fiw watchdog` |
+| Dupe detection | `/fiw dupe status`, `/fiw dupe alerts`, `/fiw dupe clear <player>` |
 
 Durations accept values such as `30s`, `5m`, `1h`, `1d`, or `1w`. `/fiw ban`/`/fiw mute` default to permanent; `/fiw tempban`/`/fiw tempmute` require a duration.
 
@@ -117,8 +129,10 @@ Files are generated in `config/fiw-admin/`. Run `/fiw reload` after editing them
 | `punishment.json` | Kick/ban/mute messages, reason requirement, broadcast, Discord, and the escalation ladder |
 | `report.json` | Report cooldown, staff-notify permission, and Discord webhook |
 | `afk.json` | AFK threshold, auto-kick, tag, and broadcast messages |
+| `watchdog.json` | Heartbeat-hang threshold, alert cooldown, crash-on-boot alert, and Discord webhook |
+| `dupe.json` | Scan interval, grace period, and the rate/signature detector settings (watch lists, thresholds, response tiers) |
 
-The mod also owns `alert-history.json`, `vanished-players.json`, `player-seen.json`, `frozen.json`, `banned-items.json`, `punishments.json`, `reports.json`, and `maintenance.flag`. These are persistent state files; stop the server before editing them manually. Never publish a Discord webhook from `alert.json`, `newplayer.json`, `punishment.json`, `report.json`, or `freeze.json` in an issue or log.
+The mod also owns `alert-history.json`, `vanished-players.json`, `player-seen.json`, `frozen.json`, `banned-items.json`, `punishments.json`, `reports.json`, `dupe-alerts.json`, and `maintenance.flag`. These are persistent state files; stop the server before editing them manually. Never publish a Discord webhook from `alert.json`, `newplayer.json`, `punishment.json`, `report.json`, `freeze.json`, `watchdog.json`, or `dupe.json` in an issue or log.
 
 ## Permissions
 
@@ -149,12 +163,16 @@ LuckPerms is supported when installed. Its explicit allow/deny result is checked
 | `fiw.afk.use` | Self-mark AFK with `/fiw afk` (granted to everyone by default) |
 | `fiw.afk.manage` | List AFK players |
 | `fiw.afk.exempt` | Exempt from AFK auto-kick |
+| `fiw.watchdog.notify` | View `/fiw watchdog` status |
+| `fiw.dupe.manage` | Use `/fiw dupe` commands |
+| `fiw.dupe.notify` | Receive dupe-detection alerts |
 
 ## Known limitations
 
 - Vanish is packet/visibility based. Sounds and particles can still reveal activity, mobs can still target vanished players, and sleep skipping still counts them.
 - Minecraft 1.20.1 and 1.21.1 do not have the newer locator-bar API, so there is no locator-bar state to hide on those versions.
 - BanItem blocks using, placing, attacking, and breaking with an item, and can confiscate it from inventories; crafting the item itself is not blocked yet.
+- Dupe detection is poll-based (scans inventories every `scanIntervalSeconds`, not on every pickup/craft/trade), so it can't identify *how* an item was gained and has a few-seconds detection lag. It defaults to alert-only for this reason — review flags before enabling an auto-response tier.
 
 ## Building from source
 

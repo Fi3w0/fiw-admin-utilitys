@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.3.0] - Watchdog and heuristic dupe detection
+
+### Added
+
+- Watchdog: a background heartbeat monitor alerts (log + optional Discord, never in-game chat) if the server stops ticking for longer than `heartbeatTimeoutSeconds`. Separately, the mod detects on boot whether the previous session shut down cleanly and alerts if it didn't (crash, `kill`, power loss). View status with `/fiw watchdog`.
+- Dupe detection: a poll-based heuristic rule engine (scans inventories on an interval rather than hooking every pickup/craft/trade) with two independent detectors, both alert-only by default. The **rate detector** flags a player (or, if `rateDetector.chunkScope.enabled`, a chunk) gaining more weighted value from an admin-configured item watch list than a threshold within a time window, exempting players with an open container by default. The **signature detector** flags a specific watched item (by NBT/component fingerprint) appearing to be held by two different players within the same scan window. Each detector can be escalated independently to auto-freeze, kick, temp-ban, or ban. `/fiw dupe status`, `/fiw dupe alerts`, and `/fiw dupe clear <player>` manage it.
+- New config files: `watchdog.json`, `dupe.json`; new state file `dupe-alerts.json`.
+- New permission nodes: `fiw.watchdog.notify`, `fiw.dupe.manage`, `fiw.dupe.notify` (all staff-only, no default-true nodes this round).
+
+### Compatibility notes
+
+- All new commands and behavior work identically across all eight release targets, verified by actually booting each loader's dev server (not just compiling) — including confirming the item-signature fingerprint uses the correct API per version (`DataComponentPatch` on 1.21.x, NBT `CompoundTag` on 1.20.1, which predates Minecraft's DataComponents).
+- Existing config/state files and commands are unchanged.
+
 ## [1.2.0] - Punishment toolkit, reports, AFK, and freeze+
 
 ### Added

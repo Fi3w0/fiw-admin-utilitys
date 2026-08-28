@@ -204,3 +204,44 @@ AFK state itself is not persisted — it resets on server restart, so there is n
 | `kickMessage` | `"&cKicked for being AFK too long."` | Shown to a player auto-kicked for AFK. |
 
 A player can also self-mark AFK with `/fiw afk` ("brb") — this is exempt from the idle-threshold auto-detection and only clears on another `/fiw afk` or on activity.
+
+## watchdog.json
+
+There is no persisted state for the watchdog itself; it keeps a marker file (`.watchdog-running`, not JSON) in `config/fiw-admin/` to detect an unclean previous shutdown, deleted automatically on a clean stop.
+
+| Field | Default | Meaning |
+|---|---|---|
+| `enabled` | `true` | Master switch for the heartbeat-hang alert. Dirty-shutdown detection is controlled separately by `crashAlertOnBoot`. |
+| `heartbeatTimeoutSeconds` | `30` | Seconds with no tick heartbeat before a hang alert fires. Kept below Minecraft's own ~60s watchdog kill so you're warned first. |
+| `alertCooldownMinutes` | `5` | Minimum time between repeated hang alerts, so a genuinely stuck server doesn't spam. |
+| `crashAlertOnBoot` | `true` | On startup, alert if the previous session's shutdown wasn't clean (crash, `kill`, or power loss). |
+| `notifyPermission` | `"fiw.watchdog.notify"` | Permission required to view `/fiw watchdog` status. Alerts themselves only go to the log and Discord, never in-game chat — a hang can mean the server thread itself is stuck. |
+| `discord.enabled` | `false` | Send hang and unclean-shutdown alerts to Discord. |
+| `discord.webhookUrl` | `""` | Discord webhook URL. **Never commit or paste this in a public issue.** |
+
+## dupe.json
+
+Rolling detection state (per-player value history, per-signature holder tracking) is in-memory only and resets on restart. `dupe-alerts.json` persists a bounded log of past flags, viewable with `/fiw dupe alerts`.
+
+| Field | Default | Meaning |
+|---|---|---|
+| `enabled` | `true` | Master switch for both detectors. |
+| `scanIntervalSeconds` | `5` | How often online players' inventories are scanned. Detection is poll-based, not event-based — see [Known limitations](README.md#known-limitations). |
+| `gracePeriodSecondsAfterStart` | `30` | Suppresses all dupe alerts for this many seconds after server start or `/fiw reload`, while inventories are first observed. |
+| `notifyPermission` | `"fiw.dupe.notify"` | Permission that receives in-game dupe alert broadcasts (any tier except `LOG`). |
+| `discord.enabled` | `false` | Send alerts to Discord (any tier of `DISCORD` or higher — see `response.tier` below). |
+| `discord.webhookUrl` | `""` | Discord webhook URL. **Never commit or paste this in a public issue.** |
+| `rateDetector.enabled` | `true` | Enable the per-player (and optionally per-chunk) value-gain-rate detector. |
+| `rateDetector.windowSeconds` | `10` | The rolling time window a value increase is measured over. |
+| `rateDetector.threshold` | `64` | Weighted value gained within `windowSeconds` that triggers a flag. |
+| `rateDetector.exemptWhileContainerOpen` | `true` | Don't flag a player who currently has a container (chest, shulker box, etc.) open — likely legitimate looting. |
+| `rateDetector.watchList` | netherite ingot (8), diamond (4), nether star (16), elytra (16) | List of `{itemId, weight}` — only these items count toward the rate total. Edit, add, or remove entries freely; item IDs are the full registry name (e.g. `minecraft:diamond`). |
+| `rateDetector.response.tier` | `"ALERT"` | What happens when the rate detector flags: `LOG` (record only), `ALERT` (+ in-game broadcast), `DISCORD` (+ Discord), `FREEZE`, `KICK`, `TEMPBAN`, or `BAN`. Punitive tiers reuse the punishment/freeze systems directly. A punitive tier on a chunk-scoped flag (no single player) is treated as `ALERT` instead, since there's no one player to act on. |
+| `rateDetector.response.durationSeconds` | `0` | Duration for a `TEMPBAN` response. `0` = permanent (also used as-is for `BAN`; ignored for other tiers). |
+| `rateDetector.chunkScope.enabled` | `false` | Also run the rate detector per-chunk over dropped `watchList` items, for farm/machine-cluster visibility. Off by default since it's more prone to false positives (e.g. legitimate item-sorting builds). |
+| `rateDetector.chunkScope.thresholdMultiplier` | `4.0` | The chunk-scoped threshold is `rateDetector.threshold × thresholdMultiplier` (higher, since a chunk naturally holds more items than one player). |
+| `signatureDetector.enabled` | `true` | Enable the duplicate-item-signature detector. Inert regardless of this flag while `watchList` is empty (the default). |
+| `signatureDetector.watchList` | `[]` | Item IDs to fingerprint by NBT/component data (e.g. a specific enchanted or named item you want to stay unique). Empty = detector does nothing. |
+| `signatureDetector.response.tier` / `.durationSeconds` | `"ALERT"` / `0` | Same tier options and semantics as `rateDetector.response`, applied when the same item signature is seen held by two different players within the same scan window. |
+
+`/fiw dupe clear <player>` resets one player's rolling rate-detector history — use it if a player's legitimate playstyle (e.g. a large, fast loot pull) triggers a false positive.

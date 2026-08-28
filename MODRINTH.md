@@ -9,6 +9,8 @@
 - **Moderation:** packet-based vanish, whois, persistent freeze+ (reason, auto-unfreeze, evidence, teleport), inventory/ender-chest item search, and timed item bans.
 - **Punishment:** kick, temp/permanent ban and mute, per-player history, and an admin-editable escalation ladder.
 - **Reports and AFK:** player-facing `/report` with staff notification, and configurable AFK tagging/auto-kick.
+- **Watchdog:** alerts on server hangs (heartbeat timeout) and unclean shutdowns (crash/kill detected on next boot).
+- **Dupe detection:** heuristic rate and item-signature detectors, alert-only by default, with an optional admin-configurable auto-freeze/kick/ban escalation per detector.
 - **Presence:** custom join/leave messages, rotating MOTDs, announcements, and first-join alerts.
 - **Configuration:** independent JSON settings per module with live `/fiw reload`.
 
@@ -35,7 +37,7 @@ NeoForge does not provide a maintained 1.20.1 release line, so that Minecraft ve
 
 ## Main commands
 
-`/fiw status` · `/fiw reload` · `/fiw maintenance` · `/fiw sweep` · `/fiw lag` · `/fiw alert` · `/fiw vanish` · `/fiw whois` · `/fiw freeze` · `/fiw find` · `/fiw banitem` · `/fiw kick` · `/fiw ban` · `/fiw tempban` · `/fiw mute` · `/fiw tempmute` · `/fiw punish` · `/fiw history` · `/report` · `/fiw reports` · `/fiw afk`
+`/fiw status` · `/fiw reload` · `/fiw maintenance` · `/fiw sweep` · `/fiw lag` · `/fiw alert` · `/fiw vanish` · `/fiw whois` · `/fiw freeze` · `/fiw find` · `/fiw banitem` · `/fiw kick` · `/fiw ban` · `/fiw tempban` · `/fiw mute` · `/fiw tempmute` · `/fiw punish` · `/fiw history` · `/report` · `/fiw reports` · `/fiw afk` · `/fiw watchdog` · `/fiw dupe`
 
 ## Important limitations
 
