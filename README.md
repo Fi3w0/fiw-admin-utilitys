@@ -22,6 +22,9 @@ Fiw Admin Tools gives server owners a focused `/fiw` command suite without requi
 - **Actionable lag alerts** — TPS history, worst-chunk reports, clickable teleport/sweep actions, notification sounds, and optional Discord webhooks.
 - **Safe cleanup** — timed or threshold-based item sweeps, dry runs, chunk-local cleanup, mob caps, warnings, and protection for named, tamed, leashed, or persistent entities.
 - **Practical moderation** — vanish, whois, freeze, inventory/ender-chest item search, and temporary or permanent item bans.
+- **Full punishment toolkit** — kick, temp/permanent ban and mute, punishment history, and an admin-editable escalation ladder for repeat offenders.
+- **Player reports and AFK detection** — a player-facing `/report` command with staff notification, and configurable AFK tagging/auto-kick.
+- **Freeze+** — reason, auto-unfreeze, evidence snapshot, and teleport-to-frozen-player on top of the existing persistent freeze.
 - **Better server presence** — custom join/leave messages, rotating MOTDs, announcements, and first-join alerts in game or through Discord.
 - **Live JSON configuration** — each module can be enabled independently and reloaded with `/fiw reload`.
 
@@ -63,7 +66,15 @@ Sweep can clean ground items on a timer, when a threshold is crossed, or only in
 
 ### Vanish and moderation
 
-Vanish hides staff from the player list, world tracking, join/leave messages, server-list counts, and—where Minecraft provides it—the locator bar. `/fiw whois` shows useful live player details, freeze persists through relogs, find searches inventories and optional ender chests, and BanItem blocks and optionally confiscates configured items.
+Vanish hides staff from the player list, world tracking, join/leave messages, server-list counts, and—where Minecraft provides it—the locator bar. `/fiw whois` shows useful live player details, freeze persists through relogs (with an optional reason, auto-unfreeze, evidence snapshot, and teleport-to-frozen-player), find searches inventories and optional ender chests, and BanItem blocks and optionally confiscates configured items.
+
+### Punishment toolkit
+
+Kick, temp-ban/ban, and temp-mute/mute with optional reasons, all logged to a per-player history. `/fiw punish <player>` walks an admin-editable escalation ladder (e.g. mute → tempban → tempban → ban) based on a player's recent offense count instead of staff guessing a duration. Staff broadcasts and Discord delivery are configurable.
+
+### Reports and AFK
+
+Players can flag problems with `/report <player> <reason>` (cooldown-limited); online staff are notified in-chat and optionally on Discord, and can claim/resolve reports with `/fiw reports`. AFK detection tags idle players in the tab list, optionally broadcasts state changes, and can auto-kick after a configurable idle period; players can also self-mark with `/fiw afk`.
 
 ### Messages and first joins
 
@@ -79,10 +90,13 @@ Replace vanilla join/leave text, rotate MOTDs, schedule announcements, and notif
 | Performance | `/fiw lag`, `/fiw lag history`, `/fiw alert on`, `/fiw alert off` |
 | Vanish | `/fiw vanish`, `/fiw vanish <player>`, `/fiw vanish list` |
 | Inspect | `/fiw whois <player>`, `/fiw find <item>` |
-| Freeze | `/fiw freeze <player>`, `/fiw freeze list` |
+| Freeze | `/fiw freeze <player> [reason]`, `/fiw freeze list`, `/fiw freeze goto <player>`, `/fiw freeze evidence <player>` |
 | BanItem | `/fiw banitem <item> [duration]`, `/fiw banitem list` |
+| Punishment | `/fiw kick <player> [reason]`, `/fiw ban <player> [reason]`, `/fiw tempban <player> <duration> [reason]`, `/fiw unban <player>`, `/fiw mute <player> [reason]`, `/fiw tempmute <player> <duration> [reason]`, `/fiw unmute <player>`, `/fiw punish <player> [reason]`, `/fiw history <player>` |
+| Reports | `/report <player> <reason>`, `/fiw reports`, `/fiw reports claim <id>`, `/fiw reports resolve <id>` |
+| AFK | `/fiw afk`, `/fiw afk list` |
 
-Durations accept values such as `30s`, `5m`, or `1h`.
+Durations accept values such as `30s`, `5m`, `1h`, `1d`, or `1w`. `/fiw ban`/`/fiw mute` default to permanent; `/fiw tempban`/`/fiw tempmute` require a duration.
 
 ## Configuration
 
@@ -100,8 +114,11 @@ Files are generated in `config/fiw-admin/`. Run `/fiw reload` after editing them
 | `announce.json` | Scheduled rotating or random announcements |
 | `newplayer.json` | First-join staff, broadcast, and Discord messages |
 | `messages.json` | Join/leave messages and rotating server-list MOTD |
+| `punishment.json` | Kick/ban/mute messages, reason requirement, broadcast, Discord, and the escalation ladder |
+| `report.json` | Report cooldown, staff-notify permission, and Discord webhook |
+| `afk.json` | AFK threshold, auto-kick, tag, and broadcast messages |
 
-The mod also owns `alert-history.json`, `vanished-players.json`, `player-seen.json`, `frozen.json`, `banned-items.json`, and `maintenance.flag`. These are persistent state files; stop the server before editing them manually. Never publish a Discord webhook from `alert.json` or `newplayer.json` in an issue or log.
+The mod also owns `alert-history.json`, `vanished-players.json`, `player-seen.json`, `frozen.json`, `banned-items.json`, `punishments.json`, `reports.json`, and `maintenance.flag`. These are persistent state files; stop the server before editing them manually. Never publish a Discord webhook from `alert.json`, `newplayer.json`, `punishment.json`, `report.json`, or `freeze.json` in an issue or log.
 
 ## Permissions
 
@@ -121,6 +138,17 @@ LuckPerms is supported when installed. Its explicit allow/deny result is checked
 | `fiw.freeze.use` | Freeze players and list frozen players |
 | `fiw.banitem.manage` | Add, remove, and list item bans |
 | `fiw.banitem.bypass` | Use banned items |
+| `fiw.punish.kick` | Kick players |
+| `fiw.punish.ban` | Ban/tempban players |
+| `fiw.punish.mute` | Mute/tempmute players |
+| `fiw.punish.manage` | Unban, unmute, view history, and use `/fiw punish` |
+| `fiw.punish.notify` | Receive punishment broadcasts |
+| `fiw.report.use` | Submit `/report` (granted to everyone by default) |
+| `fiw.report.manage` | List, claim, and resolve reports |
+| `fiw.report.notify` | Receive report notifications |
+| `fiw.afk.use` | Self-mark AFK with `/fiw afk` (granted to everyone by default) |
+| `fiw.afk.manage` | List AFK players |
+| `fiw.afk.exempt` | Exempt from AFK auto-kick |
 
 ## Known limitations
 

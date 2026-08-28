@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.2.0] - Punishment toolkit, reports, AFK, and freeze+
+
+### Added
+
+- Full punishment toolkit: `/fiw kick`, `/fiw ban`/`/fiw tempban`, `/fiw unban`, `/fiw mute`/`/fiw tempmute`, `/fiw unmute`, per-player punishment history via `/fiw history`, and `/fiw punish` — an admin-editable escalation ladder (e.g. mute → tempban → tempban → ban) that auto-picks the next tier from a player's recent offense count. Bans and mutes support permanent or timed durations (now up to a year — `Durations` gained `d`/`day`/`days` and `w`/`week`/`weeks` units), are enforced on join and while online, and can broadcast to staff and Discord.
+- Player-facing `/report <player> <reason>` with a per-player cooldown; staff are notified in-chat (and optionally on Discord) and can triage with `/fiw reports`, `/fiw reports claim <id>`, and `/fiw reports resolve <id>`.
+- AFK detection: idle players are tagged in the tab list, can broadcast when their state changes, and can be auto-kicked after a configurable idle period (with an exempt permission). Players can self-mark with `/fiw afk`; staff can list AFK players with `/fiw afk list`.
+- Freeze+: freezing now accepts an optional reason, supports auto-unfreeze after a configurable duration, can teleport the frozen player to the freezing staff member, and records an evidence snapshot (held item, position, gamemode, inventory) viewable with `/fiw freeze evidence` — plus `/fiw freeze goto` to teleport to a frozen player and Discord delivery on freeze.
+- New config files: `punishment.json`, `report.json`, `afk.json`; new state files `punishments.json`, `reports.json`; `freeze.json`/`frozen.json` gained new fields (existing installs are unaffected).
+- New permission nodes for all of the above (see README); `fiw.report.use` and `fiw.afk.use` are granted to everyone by default.
+
+### Compatibility notes
+
+- All new commands and behavior work identically across all eight release targets.
+- Existing `frozen.json`/`banned-items.json` state and all existing commands/permissions are unchanged.
+
 ## [1.1.0] - Multi-version release foundation
 
 ### Added
