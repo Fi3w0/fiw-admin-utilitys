@@ -17,6 +17,7 @@ import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.level.BlockEvent;
 import net.minecraftforge.event.server.ServerStartedEvent;
+import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.loading.FMLPaths;
@@ -63,6 +64,9 @@ public final class FiwAdminToolsForge {
         registerNode("fiw.afk.use", "AFK use", "Allows self-marking AFK.", true);
         registerNode("fiw.afk.manage", "AFK manage", "Allows listing AFK players.");
         registerNode("fiw.afk.exempt", "AFK exempt", "Exempts from AFK auto-kick.");
+        registerNode("fiw.watchdog.notify", "Watchdog notify", "Allows viewing /fiw watchdog status.");
+        registerNode("fiw.dupe.manage", "Dupe manage", "Allows using /fiw dupe commands.");
+        registerNode("fiw.dupe.notify", "Dupe notify", "Receives dupe-detection alerts.");
 
         FiwAdminToolsCore core = FiwAdminToolsCore.bootstrap(new ForgePlatform());
         runtime = new AdminRuntime(core, new ForgeAccess());
@@ -98,6 +102,11 @@ public final class FiwAdminToolsForge {
     @SubscribeEvent
     public void onServerStarted(ServerStartedEvent event) {
         runtime.onServerStarted(event.getServer());
+    }
+
+    @SubscribeEvent
+    public void onServerStopping(ServerStoppingEvent event) {
+        runtime.onServerStopping(event.getServer());
     }
 
     @SubscribeEvent
