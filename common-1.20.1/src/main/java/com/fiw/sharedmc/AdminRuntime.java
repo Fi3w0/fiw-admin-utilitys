@@ -1,5 +1,6 @@
 package com.fiw.sharedmc;
 
+import com.fiw.common.AfkConfig;
 import com.fiw.common.AlertConfig;
 import com.fiw.common.AlertHistory;
 import com.fiw.common.Durations;
@@ -10,6 +11,10 @@ import com.fiw.common.BanItemConfig;
 import com.fiw.common.InspectService;
 import com.fiw.common.MessagesConfig;
 import com.fiw.common.NewPlayerConfig;
+import com.fiw.common.PunishmentConfig;
+import com.fiw.common.PunishmentService;
+import com.fiw.common.ReportConfig;
+import com.fiw.common.ReportService;
 import com.fiw.common.SweepConfig;
 import com.fiw.common.TextFormat;
 import com.fiw.sharedmc.mixin.ChunkMapAccessor;
@@ -21,6 +26,7 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.EntityArgument;
+import net.minecraft.commands.arguments.GameProfileArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.ClickEvent;
@@ -52,6 +58,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -72,6 +79,14 @@ public final class AdminRuntime {
     private static final String PERMISSION_INSPECT_USE = "fiw.inspect.use";
     private static final String PERMISSION_FREEZE_USE = "fiw.freeze.use";
     private static final String PERMISSION_BANITEM_MANAGE = "fiw.banitem.manage";
+    private static final String PERMISSION_PUNISH_KICK = "fiw.punish.kick";
+    private static final String PERMISSION_PUNISH_BAN = "fiw.punish.ban";
+    private static final String PERMISSION_PUNISH_MUTE = "fiw.punish.mute";
+    private static final String PERMISSION_PUNISH_MANAGE = "fiw.punish.manage";
+    private static final String PERMISSION_REPORT_USE = "fiw.report.use";
+    private static final String PERMISSION_REPORT_MANAGE = "fiw.report.manage";
+    private static final String PERMISSION_AFK_USE = "fiw.afk.use";
+    private static final String PERMISSION_AFK_MANAGE = "fiw.afk.manage";
     private static final DateTimeFormatter SEEN_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private static final int[] COUNTDOWN_STEPS = {3600, 1800, 1200, 600, 300, 120, 60, 30, 10, 5, 4, 3, 2, 1};
 
@@ -116,7 +131,25 @@ public final class AdminRuntime {
                 .then(whoisCommand())
                 .then(freezeCommand())
                 .then(findCommand())
-                .then(banItemCommand()));
+                .then(banItemCommand())
+                .then(kickCommand())
+                .then(banCommand())
+                .then(tempbanCommand())
+                .then(unbanCommand())
+                .then(muteCommand())
+                .then(tempmuteCommand())
+                .then(unmuteCommand())
+                .then(punishCommand())
+                .then(historyCommand())
+                .then(reportsCommand())
+                .then(afkCommand()));
+        dispatcher.register(Commands.literal("report")
+                .requires(source -> access.hasPermission(source, PERMISSION_REPORT_USE, 0))
+                .then(Commands.argument("target", StringArgumentType.word())
+                        .then(Commands.argument("reason", StringArgumentType.greedyString())
+                                .executes(context -> submitReport(context.getSource(),
+                                        StringArgumentType.getString(context, "target"),
+                                        StringArgumentType.getString(context, "reason"))))));
     }
 
     public void onServerStarted(MinecraftServer server) {
@@ -125,10 +158,19 @@ public final class AdminRuntime {
     }
 
     public void onPlayerJoin(MinecraftServer server, ServerPlayer player) {
+        if (core.punishment().config().enabled) {
+            var ban = core.punishment().activeBan(player.getGameProfile().getId());
+            if (ban != null) {
+                String message = formatBanKickMessage(ban);
+                server.execute(() -> player.connection.disconnect(Component.literal(message)));
+                return;
+            }
+        }
         if (core.maintenance().shouldKick(player.getGameProfile().getName(), player.getGameProfile().getId(), hasMaintenanceBypass(player))) {
             server.execute(() -> player.connection.disconnect(Component.literal(core.maintenance().currentKickMessage())));
             return;
         }
+        core.afk().recordActivity(player.getGameProfile().getId());
         rememberVanishedName(player);
         syncVanishFor(player, server);
         if (core.vanish().isVanished(player.getGameProfile().getId())) {
@@ -196,6 +238,7 @@ public final class AdminRuntime {
         }
         sendCustomJoinLeave(server, player, core.messages().config().joinLeave.leaveMessage, "left");
         freezeAnchors.remove(player.getGameProfile().getId());
+        core.afk().forget(player.getGameProfile().getId());
     }
 
     public void onPlayerTrackingChanged(MinecraftServer server, ServerPlayer observer) {
@@ -252,6 +295,8 @@ public final class AdminRuntime {
         tickMotdRotation(server);
         tickSweep(server);
         tickAlert(server);
+        tickPunishments(server);
+        tickAfk(server);
         if (tickCounter % 40 == 0) {
             syncVanishForAll(server);
         }
@@ -289,8 +334,17 @@ public final class AdminRuntime {
         return Commands.literal("freeze")
                 .requires(source -> access.hasPermission(source, PERMISSION_FREEZE_USE, 3))
                 .then(Commands.literal("list").executes(context -> listFrozen(context.getSource())))
+                .then(Commands.literal("goto")
+                        .then(Commands.argument("player", EntityArgument.player())
+                                .executes(context -> teleportToFrozen(context.getSource(), EntityArgument.getPlayer(context, "player")))))
+                .then(Commands.literal("evidence")
+                        .then(Commands.argument("player", EntityArgument.player())
+                                .executes(context -> sendFreezeEvidence(context.getSource(), EntityArgument.getPlayer(context, "player")))))
                 .then(Commands.argument("player", EntityArgument.player())
-                        .executes(context -> toggleFreeze(context.getSource(), EntityArgument.getPlayer(context, "player"))));
+                        .executes(context -> toggleFreeze(context.getSource(), EntityArgument.getPlayer(context, "player"), null))
+                        .then(Commands.argument("reason", StringArgumentType.greedyString())
+                                .executes(context -> toggleFreeze(context.getSource(), EntityArgument.getPlayer(context, "player"),
+                                        StringArgumentType.getString(context, "reason")))));
     }
 
     private com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> findCommand() {
@@ -312,6 +366,116 @@ public final class AdminRuntime {
                                 .executes(context -> toggleBanItem(context.getSource(),
                                         StringArgumentType.getString(context, "item"),
                                         StringArgumentType.getString(context, "duration")))));
+    }
+
+    private com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> kickCommand() {
+        return Commands.literal("kick")
+                .requires(source -> access.hasPermission(source, PERMISSION_PUNISH_KICK, 3))
+                .then(Commands.argument("target", GameProfileArgument.gameProfile())
+                        .executes(context -> kickPlayers(context.getSource(), GameProfileArgument.getGameProfiles(context, "target"), null))
+                        .then(Commands.argument("reason", StringArgumentType.greedyString())
+                                .executes(context -> kickPlayers(context.getSource(), GameProfileArgument.getGameProfiles(context, "target"),
+                                        StringArgumentType.getString(context, "reason")))));
+    }
+
+    private com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> banCommand() {
+        return Commands.literal("ban")
+                .requires(source -> access.hasPermission(source, PERMISSION_PUNISH_BAN, 3))
+                .then(Commands.argument("target", GameProfileArgument.gameProfile())
+                        .executes(context -> banPlayers(context.getSource(), GameProfileArgument.getGameProfiles(context, "target"), null, 0))
+                        .then(Commands.argument("reason", StringArgumentType.greedyString())
+                                .executes(context -> banPlayers(context.getSource(), GameProfileArgument.getGameProfiles(context, "target"),
+                                        StringArgumentType.getString(context, "reason"), 0))));
+    }
+
+    private com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> tempbanCommand() {
+        return Commands.literal("tempban")
+                .requires(source -> access.hasPermission(source, PERMISSION_PUNISH_BAN, 3))
+                .then(Commands.argument("target", GameProfileArgument.gameProfile())
+                        .then(Commands.argument("duration", StringArgumentType.word())
+                                .executes(context -> tempbanPlayers(context.getSource(), GameProfileArgument.getGameProfiles(context, "target"),
+                                        StringArgumentType.getString(context, "duration"), null))
+                                .then(Commands.argument("reason", StringArgumentType.greedyString())
+                                        .executes(context -> tempbanPlayers(context.getSource(), GameProfileArgument.getGameProfiles(context, "target"),
+                                                StringArgumentType.getString(context, "duration"),
+                                                StringArgumentType.getString(context, "reason"))))));
+    }
+
+    private com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> unbanCommand() {
+        return Commands.literal("unban")
+                .requires(source -> access.hasPermission(source, PERMISSION_PUNISH_MANAGE, 3))
+                .then(Commands.argument("target", GameProfileArgument.gameProfile())
+                        .executes(context -> unbanPlayers(context.getSource(), GameProfileArgument.getGameProfiles(context, "target"))));
+    }
+
+    private com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> muteCommand() {
+        return Commands.literal("mute")
+                .requires(source -> access.hasPermission(source, PERMISSION_PUNISH_MUTE, 3))
+                .then(Commands.argument("target", GameProfileArgument.gameProfile())
+                        .executes(context -> mutePlayers(context.getSource(), GameProfileArgument.getGameProfiles(context, "target"), null, 0))
+                        .then(Commands.argument("reason", StringArgumentType.greedyString())
+                                .executes(context -> mutePlayers(context.getSource(), GameProfileArgument.getGameProfiles(context, "target"),
+                                        StringArgumentType.getString(context, "reason"), 0))));
+    }
+
+    private com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> tempmuteCommand() {
+        return Commands.literal("tempmute")
+                .requires(source -> access.hasPermission(source, PERMISSION_PUNISH_MUTE, 3))
+                .then(Commands.argument("target", GameProfileArgument.gameProfile())
+                        .then(Commands.argument("duration", StringArgumentType.word())
+                                .executes(context -> tempmutePlayers(context.getSource(), GameProfileArgument.getGameProfiles(context, "target"),
+                                        StringArgumentType.getString(context, "duration"), null))
+                                .then(Commands.argument("reason", StringArgumentType.greedyString())
+                                        .executes(context -> tempmutePlayers(context.getSource(), GameProfileArgument.getGameProfiles(context, "target"),
+                                                StringArgumentType.getString(context, "duration"),
+                                                StringArgumentType.getString(context, "reason"))))));
+    }
+
+    private com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> unmuteCommand() {
+        return Commands.literal("unmute")
+                .requires(source -> access.hasPermission(source, PERMISSION_PUNISH_MANAGE, 3))
+                .then(Commands.argument("target", GameProfileArgument.gameProfile())
+                        .executes(context -> unmutePlayers(context.getSource(), GameProfileArgument.getGameProfiles(context, "target"))));
+    }
+
+    private com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> punishCommand() {
+        return Commands.literal("punish")
+                .requires(source -> access.hasPermission(source, PERMISSION_PUNISH_MANAGE, 3))
+                .then(Commands.argument("target", EntityArgument.player())
+                        .executes(context -> escalatePunish(context.getSource(), EntityArgument.getPlayer(context, "target"), null))
+                        .then(Commands.argument("reason", StringArgumentType.greedyString())
+                                .executes(context -> escalatePunish(context.getSource(), EntityArgument.getPlayer(context, "target"),
+                                        StringArgumentType.getString(context, "reason")))));
+    }
+
+    private com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> historyCommand() {
+        return Commands.literal("history")
+                .requires(source -> access.hasPermission(source, PERMISSION_PUNISH_MANAGE, 3))
+                .then(Commands.argument("target", GameProfileArgument.gameProfile())
+                        .executes(context -> sendHistory(context.getSource(), GameProfileArgument.getGameProfiles(context, "target"))));
+    }
+
+    private com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> reportsCommand() {
+        return Commands.literal("reports")
+                .requires(source -> access.hasPermission(source, PERMISSION_REPORT_MANAGE, 2))
+                .executes(context -> listReports(context.getSource()))
+                .then(Commands.literal("claim")
+                        .then(Commands.argument("id", com.mojang.brigadier.arguments.IntegerArgumentType.integer(1))
+                                .executes(context -> claimReport(context.getSource(),
+                                        com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(context, "id")))))
+                .then(Commands.literal("resolve")
+                        .then(Commands.argument("id", com.mojang.brigadier.arguments.IntegerArgumentType.integer(1))
+                                .executes(context -> resolveReport(context.getSource(),
+                                        com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(context, "id")))));
+    }
+
+    private com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> afkCommand() {
+        return Commands.literal("afk")
+                .requires(source -> access.hasPermission(source, PERMISSION_AFK_USE, 0))
+                .executes(context -> toggleSelfAfk(context.getSource()))
+                .then(Commands.literal("list")
+                        .requires(source -> access.hasPermission(source, PERMISSION_AFK_MANAGE, 2))
+                        .executes(context -> listAfk(context.getSource())));
     }
 
     private com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> sweepCommand() {
@@ -1122,26 +1286,112 @@ public final class AdminRuntime {
         return isActionFrozen(player) && core.freeze().config().blockInteractions;
     }
 
-    private int toggleFreeze(CommandSourceStack source, ServerPlayer target) {
+    /** Called by the loaders before an outgoing chat message is delivered; sends the mute notice when blocked. */
+    public boolean shouldBlockChat(ServerPlayer player) {
+        recordActivity(player);
+        if (!core.punishment().config().enabled) {
+            return false;
+        }
+        var mute = core.punishment().activeMute(player.getGameProfile().getId());
+        if (mute == null) {
+            return false;
+        }
+        player.sendSystemMessage(Component.literal(TextFormat.legacyColors(core.punishment().config().defaultMuteMessage)));
+        return true;
+    }
+
+    /** Called by the loaders on player actions (block/item/attack/chat/movement) to feed AFK tracking. */
+    public void recordActivity(ServerPlayer player) {
+        core.afk().recordActivity(player.getGameProfile().getId());
+    }
+
+    private String formatBanKickMessage(PunishmentService.Sanction ban) {
+        String template = ban.expiryMillis == 0 ? core.punishment().config().defaultBanMessage
+                : core.punishment().config().defaultBanMessage + " ({remaining} remaining)";
+        String remaining = ban.expiryMillis == 0 ? "" : Durations.format((int) Math.max(1, (ban.expiryMillis - System.currentTimeMillis()) / 1000));
+        String reason = ban.reason == null || ban.reason.isBlank() ? "No reason given." : ban.reason;
+        return TextFormat.legacyColors(template.replace("{reason}", reason).replace("{remaining}", remaining));
+    }
+
+    private int toggleFreeze(CommandSourceStack source, ServerPlayer target, String reason) {
         FreezeConfig config = core.freeze().config();
         if (!config.enabled) {
             source.sendFailure(Component.literal("Freeze is disabled in freeze.json."));
             return 0;
         }
-        boolean frozen = core.freeze().toggle(target.getGameProfile().getId(), target.getGameProfile().getName());
-        if (frozen) {
-            anchorFrozenPlayer(target);
-            if (config.notifyTarget) {
-                target.sendSystemMessage(Component.literal(TextFormat.legacyColors(config.frozenMessage)));
-            }
-        } else {
+        if (core.freeze().isFrozen(target.getGameProfile().getId())) {
+            core.freeze().unfreeze(target.getGameProfile().getId());
             freezeAnchors.remove(target.getGameProfile().getId());
             if (config.notifyTarget) {
                 target.sendSystemMessage(Component.literal(TextFormat.legacyColors(config.unfrozenMessage)));
             }
+            access.log("Unfroze " + target.getGameProfile().getName());
+            source.sendSuccess(() -> Component.literal(target.getGameProfile().getName() + " is no longer frozen."), true);
+            return 1;
         }
-        access.log((frozen ? "Froze " : "Unfroze ") + target.getGameProfile().getName());
-        source.sendSuccess(() -> Component.literal(target.getGameProfile().getName() + (frozen ? " is now frozen." : " is no longer frozen.")), true);
+        if (config.reasonRequired && (reason == null || reason.isBlank())) {
+            source.sendFailure(Component.literal("A reason is required to freeze a player."));
+            return 0;
+        }
+        String staffName = source.getTextName();
+        String evidence = config.evidenceLogging ? buildFreezeEvidence(target) : "";
+        core.freeze().freeze(target.getGameProfile().getId(), target.getGameProfile().getName(), staffName, reason, config.autoUnfreezeSeconds, evidence);
+        anchorFrozenPlayer(target);
+        if (config.notifyTarget) {
+            target.sendSystemMessage(Component.literal(TextFormat.legacyColors(config.frozenMessage)));
+        }
+        if (config.teleportToStaffOnFreeze && source.getEntity() instanceof ServerPlayer staffPlayer) {
+            target.teleportTo(staffPlayer.serverLevel(), staffPlayer.getX(), staffPlayer.getY(), staffPlayer.getZ(),
+                    Set.<net.minecraft.world.entity.RelativeMovement>of(), staffPlayer.getYRot(), staffPlayer.getXRot());
+            anchorFrozenPlayer(target);
+        }
+        String logLine = staffName + " froze " + target.getGameProfile().getName()
+                + (reason != null && !reason.isBlank() ? ": " + reason : "");
+        access.log(logLine);
+        core.freeze().notifyDiscord(logLine + (evidence.isBlank() ? "" : "\n" + evidence));
+        source.sendSuccess(() -> Component.literal(target.getGameProfile().getName() + " is now frozen."), true);
+        return 1;
+    }
+
+    private String buildFreezeEvidence(ServerPlayer player) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("held: ").append(itemId(player.getMainHandItem()));
+        builder.append(", pos: ").append(player.blockPosition().toShortString());
+        builder.append(", gamemode: ").append(player.gameMode.getGameModeForPlayer().getName());
+        List<String> items = new ArrayList<>();
+        for (ItemStack stack : player.getInventory().items) {
+            if (!stack.isEmpty()) {
+                items.add(stack.getCount() + "x " + itemId(stack));
+            }
+        }
+        if (!items.isEmpty()) {
+            builder.append(", inventory: ").append(String.join(", ", items));
+        }
+        return builder.toString();
+    }
+
+    private int teleportToFrozen(CommandSourceStack source, ServerPlayer target) {
+        if (!core.freeze().isFrozen(target.getGameProfile().getId())) {
+            source.sendFailure(Component.literal(target.getGameProfile().getName() + " is not frozen."));
+            return 0;
+        }
+        if (!(source.getEntity() instanceof ServerPlayer staffPlayer)) {
+            source.sendFailure(Component.literal("Only players can use /fiw freeze goto."));
+            return 0;
+        }
+        staffPlayer.teleportTo(target.serverLevel(), target.getX(), target.getY(), target.getZ(),
+                Set.<net.minecraft.world.entity.RelativeMovement>of(), target.getYRot(), target.getXRot());
+        source.sendSuccess(() -> Component.literal("Teleported to " + target.getGameProfile().getName() + "."), false);
+        return 1;
+    }
+
+    private int sendFreezeEvidence(CommandSourceStack source, ServerPlayer target) {
+        var detail = core.freeze().detail(target.getGameProfile().getId());
+        if (detail == null || detail.evidence.isBlank()) {
+            source.sendSuccess(() -> Component.literal("No evidence recorded for " + target.getGameProfile().getName() + "."), false);
+            return 1;
+        }
+        source.sendSuccess(() -> Component.literal(target.getGameProfile().getName() + " evidence: " + detail.evidence), false);
         return 1;
     }
 
@@ -1153,9 +1403,20 @@ public final class AdminRuntime {
         source.sendSuccess(() -> Component.literal("Frozen players (" + core.freeze().frozenCount() + "):"), false);
         for (Map.Entry<String, String> entry : core.freeze().frozenEntries()) {
             String name = entry.getValue() == null || entry.getValue().isBlank() ? "unknown" : entry.getValue();
-            source.sendSuccess(() -> Component.literal("- " + name + " (" + entry.getKey() + ")"), false);
+            UUID uuid = parseUuidOrNull(entry.getKey());
+            var detail = uuid == null ? null : core.freeze().detail(uuid);
+            String reasonSuffix = detail != null && !detail.reason.isBlank() ? " - " + detail.reason : "";
+            source.sendSuccess(() -> Component.literal("- " + name + " (" + entry.getKey() + ")" + reasonSuffix), false);
         }
         return core.freeze().frozenCount();
+    }
+
+    private UUID parseUuidOrNull(String value) {
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
     }
 
     private void anchorFrozenPlayer(ServerPlayer player) {
@@ -1166,6 +1427,17 @@ public final class AdminRuntime {
     private void tickFreeze(MinecraftServer server) {
         if (!core.freeze().config().enabled || core.freeze().frozenCount() == 0) {
             return;
+        }
+        if (tickCounter % 20 == 0) {
+            for (UUID uuid : core.freeze().expiredUuids()) {
+                core.freeze().unfreeze(uuid);
+                freezeAnchors.remove(uuid);
+                ServerPlayer expiredPlayer = server.getPlayerList().getPlayer(uuid);
+                if (expiredPlayer != null && core.freeze().config().notifyTarget) {
+                    expiredPlayer.sendSystemMessage(Component.literal(TextFormat.legacyColors(core.freeze().config().unfrozenMessage)));
+                }
+                access.log("Auto-unfroze " + (expiredPlayer != null ? expiredPlayer.getGameProfile().getName() : uuid));
+            }
         }
         for (UUID uuid : core.freeze().frozenUuids()) {
             ServerPlayer player = server.getPlayerList().getPlayer(uuid);
@@ -1188,6 +1460,313 @@ public final class AdminRuntime {
 
     private record FreezeAnchor(net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> dimension,
                                 double x, double y, double z, float yRot, float xRot) {
+    }
+
+    private void tickPunishments(MinecraftServer server) {
+        if (!core.punishment().config().enabled) {
+            return;
+        }
+        core.punishment().purgeExpired();
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            if (core.punishment().activeBan(player.getGameProfile().getId()) != null) {
+                String message = formatBanKickMessage(core.punishment().activeBan(player.getGameProfile().getId()));
+                server.execute(() -> player.connection.disconnect(Component.literal(message)));
+            }
+        }
+    }
+
+    private void tickAfk(MinecraftServer server) {
+        AfkConfig config = core.afk().config();
+        if (!config.enabled) {
+            return;
+        }
+        for (UUID uuid : core.afk().refresh()) {
+            ServerPlayer player = server.getPlayerList().getPlayer(uuid);
+            String name = player != null ? player.getGameProfile().getName() : "A player";
+            boolean nowAfk = core.afk().isAfk(uuid);
+            if (config.broadcastOnChange) {
+                String template = nowAfk ? config.afkMessage : config.backMessage;
+                Component message = Component.literal(TextFormat.legacyColors(template.replace("{player}", name)));
+                for (ServerPlayer online : server.getPlayerList().getPlayers()) {
+                    online.sendSystemMessage(message);
+                }
+            }
+        }
+        if (config.kickAfterSeconds > 0) {
+            for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                UUID uuid = player.getGameProfile().getId();
+                if (!core.afk().isAfk(uuid) || access.hasPermission(player, config.exemptPermission, -1)) {
+                    continue;
+                }
+                if (core.afk().idleSeconds(uuid) >= config.kickAfterSeconds) {
+                    String message = TextFormat.legacyColors(config.kickMessage);
+                    server.execute(() -> player.connection.disconnect(Component.literal(message)));
+                }
+            }
+        }
+    }
+
+    private enum PunishKind { KICK, BAN, MUTE }
+
+    private int applyToTargets(CommandSourceStack source, Collection<GameProfile> targets, PunishKind kind, String reason, int durationSeconds) {
+        PunishmentConfig config = core.punishment().config();
+        if (!config.enabled) {
+            source.sendFailure(Component.literal("Punishments are disabled in punishment.json."));
+            return 0;
+        }
+        if (targets.isEmpty()) {
+            source.sendFailure(Component.literal("No matching player."));
+            return 0;
+        }
+        if (config.reasonRequired && (reason == null || reason.isBlank())) {
+            source.sendFailure(Component.literal("A reason is required."));
+            return 0;
+        }
+        String staffName = source.getTextName();
+        int count = 0;
+        for (GameProfile target : targets) {
+            applyPunishment(source.getServer(), target.getId(), target.getName(), staffName, kind, reason, durationSeconds);
+            count++;
+        }
+        int total = count;
+        source.sendSuccess(() -> Component.literal(kind.name() + " applied to " + total + " player(s)."), true);
+        return count;
+    }
+
+    private void applyPunishment(MinecraftServer server, UUID uuid, String name, String staffName, PunishKind kind, String reason, int durationSeconds) {
+        PunishmentConfig config = core.punishment().config();
+        switch (kind) {
+            case KICK -> {
+                core.punishment().recordKick(uuid, name, staffName, reason);
+                disconnectIfOnline(server, uuid, formatPunishMessage(config.defaultKickMessage, reason, 0));
+            }
+            case BAN -> {
+                core.punishment().ban(uuid, name, staffName, reason, durationSeconds);
+                disconnectIfOnline(server, uuid, formatPunishMessage(config.defaultBanMessage, reason, durationSeconds));
+            }
+            case MUTE -> core.punishment().mute(uuid, name, staffName, reason, durationSeconds);
+        }
+        String verb = switch (kind) {
+            case KICK -> "kicked";
+            case BAN -> durationSeconds > 0 ? "temp-banned" : "banned";
+            case MUTE -> durationSeconds > 0 ? "temp-muted" : "muted";
+        };
+        String durationSuffix = durationSeconds > 0 ? " for " + Durations.format(durationSeconds) : "";
+        String reasonSuffix = reason != null && !reason.isBlank() ? ": " + reason : "";
+        String line = staffName + " " + verb + " " + name + durationSuffix + reasonSuffix;
+        access.log(line);
+        if (config.broadcastPunishments) {
+            Component component = Component.literal(TextFormat.legacyColors("&7[Staff] &f" + line));
+            for (ServerPlayer online : server.getPlayerList().getPlayers()) {
+                if (access.hasPermission(online, config.notifyPermission, 3)) {
+                    online.sendSystemMessage(component);
+                }
+            }
+        }
+        core.punishment().notifyDiscord(line);
+    }
+
+    private String formatPunishMessage(String template, String reason, int durationSeconds) {
+        String reasonText = reason == null || reason.isBlank() ? "No reason given." : reason;
+        String remaining = durationSeconds > 0 ? Durations.format(durationSeconds) : "permanent";
+        return TextFormat.legacyColors(template.replace("{reason}", reasonText).replace("{remaining}", remaining));
+    }
+
+    private void disconnectIfOnline(MinecraftServer server, UUID uuid, String message) {
+        ServerPlayer online = server.getPlayerList().getPlayer(uuid);
+        if (online != null) {
+            server.execute(() -> online.connection.disconnect(Component.literal(message)));
+        }
+    }
+
+    private int kickPlayers(CommandSourceStack source, Collection<GameProfile> targets, String reason) {
+        return applyToTargets(source, targets, PunishKind.KICK, reason, 0);
+    }
+
+    private int banPlayers(CommandSourceStack source, Collection<GameProfile> targets, String reason, int durationSeconds) {
+        return applyToTargets(source, targets, PunishKind.BAN, reason, durationSeconds);
+    }
+
+    private int tempbanPlayers(CommandSourceStack source, Collection<GameProfile> targets, String duration, String reason) {
+        int seconds = Durations.parseSeconds(duration);
+        if (seconds < 0) {
+            source.sendFailure(Component.literal("Invalid duration '" + duration + "'. Use e.g. 30s, 5m, 1h, 1d."));
+            return 0;
+        }
+        return applyToTargets(source, targets, PunishKind.BAN, reason, seconds);
+    }
+
+    private int mutePlayers(CommandSourceStack source, Collection<GameProfile> targets, String reason, int durationSeconds) {
+        return applyToTargets(source, targets, PunishKind.MUTE, reason, durationSeconds);
+    }
+
+    private int tempmutePlayers(CommandSourceStack source, Collection<GameProfile> targets, String duration, String reason) {
+        int seconds = Durations.parseSeconds(duration);
+        if (seconds < 0) {
+            source.sendFailure(Component.literal("Invalid duration '" + duration + "'. Use e.g. 30s, 5m, 1h, 1d."));
+            return 0;
+        }
+        return applyToTargets(source, targets, PunishKind.MUTE, reason, seconds);
+    }
+
+    private int unbanPlayers(CommandSourceStack source, Collection<GameProfile> targets) {
+        int count = 0;
+        for (GameProfile target : targets) {
+            if (core.punishment().unban(target.getId())) {
+                access.log(source.getTextName() + " unbanned " + target.getName());
+                count++;
+            }
+        }
+        int total = count;
+        source.sendSuccess(() -> Component.literal("Unbanned " + total + " player(s)."), true);
+        return count;
+    }
+
+    private int unmutePlayers(CommandSourceStack source, Collection<GameProfile> targets) {
+        int count = 0;
+        for (GameProfile target : targets) {
+            if (core.punishment().unmute(target.getId())) {
+                access.log(source.getTextName() + " unmuted " + target.getName());
+                count++;
+            }
+        }
+        int total = count;
+        source.sendSuccess(() -> Component.literal("Unmuted " + total + " player(s)."), true);
+        return count;
+    }
+
+    private int escalatePunish(CommandSourceStack source, ServerPlayer target, String reason) {
+        if (!core.punishment().config().enabled) {
+            source.sendFailure(Component.literal("Punishments are disabled in punishment.json."));
+            return 0;
+        }
+        PunishmentConfig.Tier tier = core.punishment().nextEscalationTier(target.getGameProfile().getId());
+        if (tier == null) {
+            source.sendFailure(Component.literal("No escalation ladder configured in punishment.json."));
+            return 0;
+        }
+        PunishKind kind = tier.action == PunishmentConfig.Action.MUTE ? PunishKind.MUTE : PunishKind.BAN;
+        int durationSeconds = tier.action == PunishmentConfig.Action.BAN ? 0 : tier.durationSeconds;
+        applyPunishment(source.getServer(), target.getGameProfile().getId(), target.getGameProfile().getName(), source.getTextName(), kind, reason, durationSeconds);
+        String tierLabel = tier.action.name().toLowerCase(Locale.ROOT) + (durationSeconds > 0 ? " " + Durations.format(durationSeconds) : "");
+        source.sendSuccess(() -> Component.literal("Escalation applied to " + target.getGameProfile().getName() + " (" + tierLabel + ")."), true);
+        return 1;
+    }
+
+    private int sendHistory(CommandSourceStack source, Collection<GameProfile> targets) {
+        if (targets.isEmpty()) {
+            source.sendFailure(Component.literal("No matching player."));
+            return 0;
+        }
+        int total = 0;
+        for (GameProfile target : targets) {
+            List<PunishmentService.HistoryEntry> history = core.punishment().history(target.getId());
+            source.sendSuccess(() -> Component.literal(target.getName() + " history (" + history.size() + "):"), false);
+            for (PunishmentService.HistoryEntry entry : history) {
+                String line = "- " + entry.type + " by " + entry.staffName
+                        + (entry.durationSeconds > 0 ? " (" + Durations.format(entry.durationSeconds) + ")" : "")
+                        + (entry.reason != null && !entry.reason.isBlank() ? ": " + entry.reason : "");
+                source.sendSuccess(() -> Component.literal(line), false);
+            }
+            total += history.size();
+        }
+        return Math.max(1, total);
+    }
+
+    private int submitReport(CommandSourceStack source, String targetName, String reason) {
+        if (!core.report().config().enabled) {
+            source.sendFailure(Component.literal("Reports are disabled in report.json."));
+            return 0;
+        }
+        ServerPlayer reporter = source.getPlayer();
+        if (reporter == null) {
+            source.sendFailure(Component.literal("Only players can use /report."));
+            return 0;
+        }
+        UUID reporterUuid = reporter.getGameProfile().getId();
+        int cooldown = core.report().cooldownRemaining(reporterUuid);
+        if (cooldown > 0) {
+            String cooldownText = TextFormat.legacyColors(core.report().config().cooldownMessage) + " (" + Durations.format(cooldown) + ")";
+            source.sendFailure(Component.literal(cooldownText));
+            return 0;
+        }
+        ReportService.Report report = core.report().submit(reporterUuid, reporter.getGameProfile().getName(), targetName, reason);
+        source.sendSuccess(() -> Component.literal(TextFormat.legacyColors(core.report().config().submittedMessage)), false);
+        String line = "Report #" + report.id + ": " + reporter.getGameProfile().getName() + " reported " + targetName + ": " + reason;
+        access.log(line);
+        Component staffMessage = Component.literal(TextFormat.legacyColors("&7[Report] &f" + line));
+        for (ServerPlayer online : source.getServer().getPlayerList().getPlayers()) {
+            if (access.hasPermission(online, core.report().config().notifyPermission, 2)) {
+                online.sendSystemMessage(staffMessage);
+            }
+        }
+        core.report().notifyDiscord(line);
+        return 1;
+    }
+
+    private int listReports(CommandSourceStack source) {
+        List<ReportService.Report> open = core.report().openReports();
+        if (open.isEmpty()) {
+            source.sendSuccess(() -> Component.literal("No open reports."), false);
+            return 1;
+        }
+        source.sendSuccess(() -> Component.literal("Open reports (" + open.size() + "):"), false);
+        for (ReportService.Report report : open) {
+            String line = "- #" + report.id + " " + report.reporterName + " -> " + report.targetName + ": " + report.reason
+                    + " (" + report.status + (report.claimedBy.isBlank() ? "" : " by " + report.claimedBy) + ")";
+            source.sendSuccess(() -> Component.literal(line), false);
+        }
+        return open.size();
+    }
+
+    private int claimReport(CommandSourceStack source, int id) {
+        if (!core.report().claim(id, source.getTextName())) {
+            source.sendFailure(Component.literal("Report #" + id + " not found or already resolved."));
+            return 0;
+        }
+        source.sendSuccess(() -> Component.literal("Claimed report #" + id + "."), true);
+        return 1;
+    }
+
+    private int resolveReport(CommandSourceStack source, int id) {
+        if (!core.report().resolve(id)) {
+            source.sendFailure(Component.literal("Report #" + id + " not found."));
+            return 0;
+        }
+        source.sendSuccess(() -> Component.literal("Resolved report #" + id + "."), true);
+        return 1;
+    }
+
+    private int toggleSelfAfk(CommandSourceStack source) {
+        ServerPlayer player = source.getPlayer();
+        if (player == null) {
+            source.sendFailure(Component.literal("Only players can use /fiw afk."));
+            return 0;
+        }
+        if (!core.afk().config().enabled) {
+            source.sendFailure(Component.literal("AFK detection is disabled in afk.json."));
+            return 0;
+        }
+        boolean nowAfk = core.afk().toggleManual(player.getGameProfile().getId());
+        source.sendSuccess(() -> Component.literal(nowAfk ? "You are now marked AFK." : "You are no longer AFK."), false);
+        return 1;
+    }
+
+    private int listAfk(CommandSourceStack source) {
+        Set<UUID> afk = core.afk().afkPlayers();
+        if (afk.isEmpty()) {
+            source.sendSuccess(() -> Component.literal("No AFK players."), false);
+            return 1;
+        }
+        source.sendSuccess(() -> Component.literal("AFK players (" + afk.size() + "):"), false);
+        for (UUID uuid : afk) {
+            ServerPlayer player = source.getServer().getPlayerList().getPlayer(uuid);
+            String name = player != null ? player.getGameProfile().getName() : uuid.toString();
+            long idleSeconds = core.afk().idleSeconds(uuid);
+            String idleText = idleSeconds < 0 ? "?" : Durations.format((int) idleSeconds);
+            source.sendSuccess(() -> Component.literal("- " + name + " (idle " + idleText + ")"), false);
+        }
+        return afk.size();
     }
 
     private int toggleVanish(CommandSourceStack source) {
@@ -1333,11 +1912,14 @@ public final class AdminRuntime {
     }
 
     public Component tabListDisplayName(ServerPlayer player, Component original) {
-        if (!isVanished(player)) {
-            return original;
-        }
         Component base = original == null ? player.getName() : original;
-        return Component.literal(core.vanish().config().vanishedPrefix).withStyle(ChatFormatting.GRAY).append(base);
+        if (isVanished(player)) {
+            base = Component.literal(core.vanish().config().vanishedPrefix).withStyle(ChatFormatting.GRAY).append(base);
+        }
+        if (core.afk().isAfk(player.getGameProfile().getId())) {
+            base = Component.literal(TextFormat.legacyColors(core.afk().config().tag + " ")).append(base);
+        }
+        return base;
     }
 
     public Optional<ServerStatus.Players> serverStatusPlayers(MinecraftServer server, ServerStatus.Players original) {
