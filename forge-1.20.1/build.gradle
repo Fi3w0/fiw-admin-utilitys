@@ -38,11 +38,11 @@ minecraft {
     runs {
         client {
             workingDirectory project.file('run')
-            mods { fiw_admin_tools { source sourceSets.main } }
+            mods { fiw_admin_tools { source sourceSets.main; source project(':core').sourceSets.main } }
         }
         server {
             workingDirectory project.file('run')
-            mods { fiw_admin_tools { source sourceSets.main } }
+            mods { fiw_admin_tools { source sourceSets.main; source project(':core').sourceSets.main } }
         }
     }
 }
