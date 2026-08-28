@@ -11,6 +11,10 @@
 - New config files: `punishment.json`, `report.json`, `afk.json`; new state files `punishments.json`, `reports.json`; `freeze.json`/`frozen.json` gained new fields (existing installs are unaffected).
 - New permission nodes for all of the above (see README); `fiw.report.use` and `fiw.afk.use` are granted to everyone by default.
 
+### Fixed
+
+> **The NeoForge 1.21.11 build was broken and would refuse to start on a real server.** It was pinned to NeoForge `26.1.2.75`, which actually bundles Mojang's calendar-versioned "26.1.2" release, not Minecraft 1.21.11 — the mod's own version check then rejected it on every boot. It now correctly targets NeoForge `21.11.45` (Java 21, matching the other 1.21.x NeoForge builds). If you run NeoForge 1.21.11, update to this release.
+
 ### Compatibility notes
 
 - All new commands and behavior work identically across all eight release targets.

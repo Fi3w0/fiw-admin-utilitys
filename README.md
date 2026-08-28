@@ -44,7 +44,7 @@ This mod is **server-side only**. Vanilla clients can join normally.
 | Minecraft | Loader | Minimum loader/API | Java | Release jar |
 |---|---|---|---:|---|
 | 1.21.11 | Fabric | Loader 0.19.2, Fabric API 0.141.4 | 21 | `fiw-admin-tools-fabric-1.21.11-<version>.jar` |
-| 1.21.11 | NeoForge | 26.1.2.75 | 25 | `fiw-admin-tools-neoforge-1.21.11-<version>.jar` |
+| 1.21.11 | NeoForge | 21.11.45 | 21 | `fiw-admin-tools-neoforge-1.21.11-<version>.jar` |
 | 1.21.8 | Fabric | Loader 0.19.2, Fabric API 0.130.0 | 21 | `fiw-admin-tools-fabric-1.21.8-<version>.jar` |
 | 1.21.8 | NeoForge | 21.8.53 | 21 | `fiw-admin-tools-neoforge-1.21.8-<version>.jar` |
 | 1.21.1 | Fabric | Loader 0.19.2, Fabric API 0.115.0 | 21 | `fiw-admin-tools-fabric-1.21.1-<version>.jar` |
@@ -158,7 +158,7 @@ LuckPerms is supported when installed. Its explicit allow/deny result is checked
 
 ## Building from source
 
-The Gradle runtime uses JDK 21 and resolves the Java 17, 21, and 25 toolchains required by individual targets.
+The Gradle runtime uses JDK 21 and resolves the Java 17 and 21 toolchains required by individual targets.
 
 ```bash
 ./gradlew build
