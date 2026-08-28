@@ -21,6 +21,7 @@ import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import net.neoforged.neoforge.server.permission.PermissionAPI;
 import net.neoforged.neoforge.server.permission.events.PermissionGatherEvent;
@@ -65,6 +66,9 @@ public final class FiwAdminToolsNeoForge {
         registerNode("fiw.afk.use", "AFK use", "Allows self-marking AFK.", true);
         registerNode("fiw.afk.manage", "AFK manage", "Allows listing AFK players.");
         registerNode("fiw.afk.exempt", "AFK exempt", "Exempts from AFK auto-kick.");
+        registerNode("fiw.watchdog.notify", "Watchdog notify", "Allows viewing /fiw watchdog status.");
+        registerNode("fiw.dupe.manage", "Dupe manage", "Allows using /fiw dupe commands.");
+        registerNode("fiw.dupe.notify", "Dupe notify", "Receives dupe-detection alerts.");
 
         FiwAdminToolsCore core = FiwAdminToolsCore.bootstrap(new NeoForgePlatform());
         runtime = new AdminRuntime(core, new NeoForgeAccess());
@@ -73,6 +77,7 @@ public final class FiwAdminToolsNeoForge {
         NeoForge.EVENT_BUS.addListener(this::registerCommands);
         NeoForge.EVENT_BUS.addListener(this::registerPermissionNodes);
         NeoForge.EVENT_BUS.addListener(this::onServerStarted);
+        NeoForge.EVENT_BUS.addListener(this::onServerStopping);
         NeoForge.EVENT_BUS.addListener(this::onServerTick);
         NeoForge.EVENT_BUS.addListener(this::onPlayerLoggedIn);
         NeoForge.EVENT_BUS.addListener(this::onPlayerLoggedOut);
@@ -108,6 +113,10 @@ public final class FiwAdminToolsNeoForge {
 
     private void onServerStarted(ServerStartedEvent event) {
         runtime.onServerStarted(event.getServer());
+    }
+
+    private void onServerStopping(ServerStoppingEvent event) {
+        runtime.onServerStopping(event.getServer());
     }
 
     private void onServerTick(ServerTickEvent.Post event) {

@@ -39,6 +39,9 @@ object FiwAdminToolsFabric : ModInitializer {
 		ServerLifecycleEvents.SERVER_STARTED.register { server ->
 			runtime.onServerStarted(server)
 		}
+		ServerLifecycleEvents.SERVER_STOPPING.register { server ->
+			runtime.onServerStopping(server)
+		}
 		ServerTickEvents.END_SERVER_TICK.register { server ->
 			runtime.onServerTick(server)
 		}
