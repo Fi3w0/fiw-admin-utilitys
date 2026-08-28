@@ -15,6 +15,7 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.ServerChatEvent;
 import net.neoforged.neoforge.event.entity.player.AttackEntityEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
@@ -53,6 +54,17 @@ public final class FiwAdminToolsNeoForge {
         registerNode("fiw.freeze.use", "Freeze use", "Allows freezing players.");
         registerNode("fiw.banitem.manage", "BanItem manage", "Allows banning/unbanning items.");
         registerNode("fiw.banitem.bypass", "BanItem bypass", "Allows using banned items.");
+        registerNode("fiw.punish.kick", "Punish kick", "Allows kicking players.");
+        registerNode("fiw.punish.ban", "Punish ban", "Allows banning/tempbanning players.");
+        registerNode("fiw.punish.mute", "Punish mute", "Allows muting/tempmuting players.");
+        registerNode("fiw.punish.manage", "Punish manage", "Allows unban/unmute/history/punish.");
+        registerNode("fiw.punish.notify", "Punish notify", "Receives punishment broadcasts.");
+        registerNode("fiw.report.use", "Report use", "Allows submitting /report.", true);
+        registerNode("fiw.report.manage", "Report manage", "Allows managing reports.");
+        registerNode("fiw.report.notify", "Report notify", "Receives report notifications.");
+        registerNode("fiw.afk.use", "AFK use", "Allows self-marking AFK.", true);
+        registerNode("fiw.afk.manage", "AFK manage", "Allows listing AFK players.");
+        registerNode("fiw.afk.exempt", "AFK exempt", "Exempts from AFK auto-kick.");
 
         FiwAdminToolsCore core = FiwAdminToolsCore.bootstrap(new NeoForgePlatform());
         runtime = new AdminRuntime(core, new NeoForgeAccess());
@@ -69,15 +81,20 @@ public final class FiwAdminToolsNeoForge {
         NeoForge.EVENT_BUS.addListener(this::onRightClickBlock);
         NeoForge.EVENT_BUS.addListener(this::onRightClickItem);
         NeoForge.EVENT_BUS.addListener(this::onAttackEntity);
+        NeoForge.EVENT_BUS.addListener(this::onServerChat);
     }
 
     private static void registerNode(String node, String name, String description) {
+        registerNode(node, name, description, false);
+    }
+
+    private static void registerNode(String node, String name, String description, boolean defaultValue) {
         String withoutPrefix = node.startsWith("fiw.") ? node.substring("fiw.".length()) : node;
         PERMISSIONS.put(node, new PermissionNode<>(
                 "fiw",
                 withoutPrefix,
                 PermissionTypes.BOOLEAN,
-                (player, uuid, context) -> false
+                (player, uuid, context) -> defaultValue
         ).setInformation(Component.literal(name), Component.literal(description)));
     }
 
@@ -116,29 +133,43 @@ public final class FiwAdminToolsNeoForge {
     }
 
     private void onBlockBreak(BlockEvent.BreakEvent event) {
-        if (event.getPlayer() instanceof ServerPlayer player
-                && (runtime.shouldBlockInteraction(player) || runtime.shouldBlockItemUse(player, player.getMainHandItem()))) {
-            event.setCanceled(true);
+        if (event.getPlayer() instanceof ServerPlayer player) {
+            runtime.recordActivity(player);
+            if (runtime.shouldBlockInteraction(player) || runtime.shouldBlockItemUse(player, player.getMainHandItem())) {
+                event.setCanceled(true);
+            }
         }
     }
 
     private void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
-        if (event.getEntity() instanceof ServerPlayer player
-                && (runtime.shouldBlockInteraction(player) || runtime.shouldBlockItemUse(player, event.getItemStack()))) {
-            event.setCanceled(true);
+        if (event.getEntity() instanceof ServerPlayer player) {
+            runtime.recordActivity(player);
+            if (runtime.shouldBlockInteraction(player) || runtime.shouldBlockItemUse(player, event.getItemStack())) {
+                event.setCanceled(true);
+            }
         }
     }
 
     private void onRightClickItem(PlayerInteractEvent.RightClickItem event) {
-        if (event.getEntity() instanceof ServerPlayer player
-                && (runtime.shouldBlockInteraction(player) || runtime.shouldBlockItemUse(player, event.getItemStack()))) {
-            event.setCanceled(true);
+        if (event.getEntity() instanceof ServerPlayer player) {
+            runtime.recordActivity(player);
+            if (runtime.shouldBlockInteraction(player) || runtime.shouldBlockItemUse(player, event.getItemStack())) {
+                event.setCanceled(true);
+            }
         }
     }
 
     private void onAttackEntity(AttackEntityEvent event) {
-        if (event.getEntity() instanceof ServerPlayer player
-                && (runtime.shouldBlockInteraction(player) || runtime.shouldBlockItemUse(player, player.getMainHandItem()))) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            runtime.recordActivity(player);
+            if (runtime.shouldBlockInteraction(player) || runtime.shouldBlockItemUse(player, player.getMainHandItem())) {
+                event.setCanceled(true);
+            }
+        }
+    }
+
+    private void onServerChat(ServerChatEvent event) {
+        if (runtime.shouldBlockChat(event.getPlayer())) {
             event.setCanceled(true);
         }
     }
