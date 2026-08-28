@@ -9,9 +9,14 @@
 - New config files: `watchdog.json`, `dupe.json`; new state file `dupe-alerts.json`.
 - New permission nodes: `fiw.watchdog.notify`, `fiw.dupe.manage`, `fiw.dupe.notify` (all staff-only, no default-true nodes this round).
 
+### Fixed
+
+- The dupe rate detector re-alerted on every scan for as long as the triggering item stayed in inventory (the rolling window kept spanning the pre-spike baseline), spamming staff/Discord with repeats of the same flag. It now alerts once per detection, then cools down for `windowSeconds` before it can fire again for the same player/chunk.
+- The watchdog's hang alert could fire falsely a short time after vanilla auto-pauses ticking for an empty server (`pause-when-empty-seconds` in `server.properties`) — that pause stops the tick heartbeat too, which the watchdog previously couldn't tell apart from a real hang. It now suppresses hang checks while no players are online and resets the heartbeat the moment someone (re)connects.
+
 ### Compatibility notes
 
-- All new commands and behavior work identically across all eight release targets, verified by actually booting each loader's dev server (not just compiling) — including confirming the item-signature fingerprint uses the correct API per version (`DataComponentPatch` on 1.21.x, NBT `CompoundTag` on 1.20.1, which predates Minecraft's DataComponents).
+- All new commands and behavior work identically across all eight release targets, verified by actually booting each loader's dev server (not just compiling) — including confirming the item-signature fingerprint uses the correct API per version (`DataComponentPatch` on 1.21.x, NBT `CompoundTag` on 1.20.1, which predates Minecraft's DataComponents), and both fixes above were caught and re-verified live against a connected player, not just in unit tests.
 - Existing config/state files and commands are unchanged.
 
 ## [1.2.0] - Punishment toolkit, reports, AFK, and freeze+

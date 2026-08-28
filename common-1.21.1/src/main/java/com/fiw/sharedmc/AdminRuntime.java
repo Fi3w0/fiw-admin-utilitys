@@ -204,6 +204,7 @@ public final class AdminRuntime {
         if (isActionFrozen(player)) {
             anchorFrozenPlayer(player);
         }
+        core.watchdog().setPlayersOnline(true);
     }
 
     private void sendCustomJoinLeave(MinecraftServer server, ServerPlayer player, String template, String action) {
@@ -259,6 +260,9 @@ public final class AdminRuntime {
         sendCustomJoinLeave(server, player, core.messages().config().joinLeave.leaveMessage, "left");
         freezeAnchors.remove(player.getGameProfile().getId());
         core.afk().forget(player.getGameProfile().getId());
+        boolean anyoneElseOnline = server.getPlayerList().getPlayers().stream()
+                .anyMatch(other -> !other.getGameProfile().getId().equals(player.getGameProfile().getId()));
+        core.watchdog().setPlayersOnline(anyoneElseOnline);
     }
 
     public void onPlayerTrackingChanged(MinecraftServer server, ServerPlayer observer) {
@@ -1892,6 +1896,9 @@ public final class AdminRuntime {
             if (config.rateDetector.exemptWhileContainerOpen && player.containerMenu != player.inventoryMenu) {
                 continue;
             }
+            if (!core.dupe().shouldAlert(key, config.rateDetector.windowSeconds)) {
+                continue;
+            }
             String detail = player.getGameProfile().getName() + " gained " + String.format(Locale.ROOT, "%.1f", increase)
                     + " weighted watch-list value in " + config.rateDetector.windowSeconds
                     + "s (threshold " + config.rateDetector.threshold + ").";
@@ -1947,6 +1954,9 @@ public final class AdminRuntime {
         for (Map.Entry<String, Double> entry : chunkValues.entrySet()) {
             double increase = core.dupe().rateIncrease("chunk:" + entry.getKey(), entry.getValue(), config.rateDetector.windowSeconds);
             if (increase < chunkThreshold) {
+                continue;
+            }
+            if (!core.dupe().shouldAlert("chunk:" + entry.getKey(), config.rateDetector.windowSeconds)) {
                 continue;
             }
             String detail = "Chunk " + entry.getKey() + " gained " + String.format(Locale.ROOT, "%.1f", increase)

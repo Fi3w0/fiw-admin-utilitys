@@ -17,6 +17,7 @@ public final class WatchdogService {
     private WatchdogConfig config = WatchdogConfig.defaults();
     private volatile long lastHeartbeatMillis = System.currentTimeMillis();
     private volatile long lastAlertMillis;
+    private volatile boolean playersOnline;
     private ScheduledExecutorService executor;
 
     public WatchdogService(FiwPlatform platform) {
@@ -36,6 +37,19 @@ public final class WatchdogService {
 
     public void recordHeartbeat() {
         lastHeartbeatMillis = System.currentTimeMillis();
+    }
+
+    /**
+     * Tells the watchdog whether any players are currently online. Vanilla auto-pauses world
+     * ticking (and stops firing the server-tick event, so the heartbeat goes stale) once the
+     * server has been empty for a while — that's an intentional pause, not a hang, so hang alerts
+     * are suppressed while nobody is online.
+     */
+    public void setPlayersOnline(boolean online) {
+        playersOnline = online;
+        if (online) {
+            recordHeartbeat();
+        }
     }
 
     public long heartbeatAgeSeconds() {
@@ -75,7 +89,7 @@ public final class WatchdogService {
     }
 
     private void checkHeartbeat() {
-        if (!config.enabled) {
+        if (!config.enabled || !playersOnline) {
             return;
         }
         long ageSeconds = heartbeatAgeSeconds();

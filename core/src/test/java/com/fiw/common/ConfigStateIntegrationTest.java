@@ -132,6 +132,33 @@ final class ConfigStateIntegrationTest {
     }
 
     @Test
+    void dupeAlertCooldownSuppressesRepeatedFiringForTheSameKey() {
+        DupeService service = new DupeService(new TestPlatform(tempDir));
+        service.reload();
+
+        assertTrue(service.shouldAlert("player-1", 60));
+        assertFalse(service.shouldAlert("player-1", 60));
+        assertTrue(service.shouldAlert("player-2", 60));
+
+        service.clearHistory("player-1");
+        assertTrue(service.shouldAlert("player-1", 60));
+    }
+
+    @Test
+    void watchdogResetsHeartbeatWhenPlayersReconnect() {
+        WatchdogService service = new WatchdogService(new TestPlatform(tempDir));
+        service.reload();
+        service.onServerStarted();
+        try {
+            service.setPlayersOnline(false);
+            service.setPlayersOnline(true);
+            assertEquals(0, service.heartbeatAgeSeconds());
+        } finally {
+            service.onServerStopping();
+        }
+    }
+
+    @Test
     void dupeSignatureDetectsSimultaneousDifferentHolders() {
         DupeService service = new DupeService(new TestPlatform(tempDir));
         service.reload();

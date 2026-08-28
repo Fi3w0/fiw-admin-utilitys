@@ -24,6 +24,7 @@ public final class DupeService {
 
     private final Map<String, Deque<HistoryPoint>> rateHistory = new HashMap<>();
     private final Map<String, SignatureRecord> signatures = new HashMap<>();
+    private final Map<String, Long> lastAlertMillis = new HashMap<>();
 
     public DupeService(FiwPlatform platform) {
         this.platform = platform;
@@ -87,9 +88,25 @@ public final class DupeService {
         return null;
     }
 
-    /** Clears rolling rate-detector history for a key (player UUID or chunk key) — the false-positive escape hatch. */
+    /**
+     * Returns true (and records now as the last-alert time) if {@code key} hasn't alerted within
+     * {@code cooldownSeconds}. Without this, a still-elevated rolling value would re-alert on every
+     * scan for as long as the window keeps spanning the pre-spike baseline.
+     */
+    public boolean shouldAlert(String key, int cooldownSeconds) {
+        long now = System.currentTimeMillis();
+        Long last = lastAlertMillis.get(key);
+        if (last != null && now - last < cooldownSeconds * 1000L) {
+            return false;
+        }
+        lastAlertMillis.put(key, now);
+        return true;
+    }
+
+    /** Clears rolling rate-detector history and alert cooldown for a key (player UUID or chunk key) — the false-positive escape hatch. */
     public void clearHistory(String key) {
         rateHistory.remove(key);
+        lastAlertMillis.remove(key);
     }
 
     private record HistoryPoint(long timestampMillis, double value) {
