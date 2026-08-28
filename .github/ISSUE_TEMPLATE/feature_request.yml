@@ -1,0 +1,50 @@
+name: Feature request
+description: Suggest an admin command, config option, integration, or improvement.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like?
+      description: Describe the behavior from a server administrator's point of view.
+    validations:
+      required: true
+
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Use case
+      description: What server problem does this solve, and how do you handle it today?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: targets
+    attributes:
+      label: Relevant targets
+      multiple: true
+      options:
+        - All targets
+        - Fabric 1.21.11
+        - NeoForge 1.21.11
+        - Fabric 1.21.8
+        - NeoForge 1.21.8
+        - Fabric 1.21.1
+        - NeoForge 1.21.1
+        - Fabric 1.20.1
+        - Forge 1.20.1
+
+  - type: textarea
+    id: example
+    attributes:
+      label: Example command or config
+      description: Show the command/config shape you have in mind, if applicable.
+      render: text
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and this is not already requested.
+          required: true

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Modrinth downloads
+    url: https://modrinth.com/mod/fiw-admin-utilitys
+    about: Download the latest jar for your loader and Minecraft version.
+  - name: Usage and configuration
+    url: https://github.com/Fi3w0/fiw-admin-utilitys#configuration
+    about: Check commands, permissions, config files, and setup before filing a question.

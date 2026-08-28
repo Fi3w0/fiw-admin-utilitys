@@ -1,0 +1,78 @@
+plugins {
+    id 'net.neoforged.moddev'
+}
+
+evaluationDependsOn(':core')
+
+def targetProperties = new Properties()
+file('gradle.properties').withInputStream { targetProperties.load(it) }
+targetProperties.each { key, value -> project.ext.set(key.toString(), value) }
+
+base {
+    archivesName = "${project.archives_base_name}-neoforge-${project.minecraft_version}"
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(project.java_version as int)
+    }
+
+    withSourcesJar()
+}
+
+sourceSets {
+    main {
+        java.srcDir rootProject.file('common-1.21.11/src/main/java')
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = project.java_version as int
+}
+
+neoForge {
+    version = project.neoforge_version
+    validateAccessTransformers = true
+
+    runs {
+        client {
+            client()
+        }
+        server {
+            server()
+        }
+    }
+
+    mods {
+        fiw_admin_tools {
+            sourceSet sourceSets.main
+            sourceSet project(':core').sourceSets.main
+        }
+    }
+}
+
+dependencies {
+    implementation project(':core')
+    jarJar project(':core')
+}
+
+tasks.named('processResources', ProcessResources).configure {
+    def properties = [
+            version             : project.version,
+            neoforge_mod_id     : project.neoforge_mod_id,
+            mod_name            : project.mod_name,
+            mod_description     : project.mod_description,
+            mod_license         : project.mod_license,
+            mod_author          : project.mod_author,
+            minecraft_version   : project.minecraft_version,
+            minecraft_version_range: project.minecraft_version_range,
+            neo_version         : project.neoforge_version,
+            neo_version_range   : "[${project.neoforge_version},)"
+    ]
+
+    inputs.properties(properties)
+
+    filesMatching('META-INF/neoforge.mods.toml') {
+        expand properties
+    }
+}

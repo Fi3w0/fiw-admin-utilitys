@@ -1,0 +1,48 @@
+# Changelog
+
+## [1.1.0] - Multi-version release foundation
+
+### Added
+
+- Fabric and NeoForge builds for Minecraft 1.21.8 and 1.21.1.
+- Fabric and Forge builds for Minecraft 1.20.1.
+- GitHub Actions CI for the complete eight-target build matrix.
+- Automatic tagged GitHub releases and idempotent Modrinth publishing for project `f1yH9Ggq`.
+- Manual release recovery workflow, GitHub issue forms, pull request template, contribution guide, security policy, and repository metadata.
+
+### Changed
+
+- Reorganized the project into a Minecraft-independent `core`, exact-version `common-*` integrations, and thin loader modules.
+- Ported every existing command, config, persistent state, permission, and server-side feature using official Mojang mappings for each target.
+- Made Fabric permission integration optional at runtime; LuckPerms and vanilla operator fallback continue to work without Fabric Permissions API.
+- Expanded the README and platform descriptions with setup, compatibility, commands, configuration, permissions, and known limitations.
+
+### Compatibility notes
+
+- Minecraft 1.20.1 uses Forge because NeoForge has no maintained 1.20.1 release line.
+- Locator-bar hiding is only applied on Minecraft versions that expose the relevant server API.
+
+## [1.0.0] - Initial release
+
+Initial release for Minecraft 1.21.11 — Fabric and NeoForge, fully server-side.
+
+### Added
+
+- Fabric and NeoForge server-side builds.
+- `/fiw` command tree with reload/status commands.
+- Maintenance mode: persistent lockout state, MOTD override, allowlist, bypass permission, kick-on-enable, and join blocking. Restart countdown via `/fiw maintenance in <duration> [message...]` with broadcast warnings, `/fiw maintenance cancel`, configurable countdown text, and optional server stop.
+- Sweep: timed cleanup, threshold item cleanup, chunk-local cleanup, mob caps, warnings, actionbar countdowns, dry-run counts, and configurable announcements.
+- Alert: TPS checks, cooldown/escalation, top loaded chunk reports, clickable teleport/sweep actions, notification sound, Discord webhooks, and persistent alert history.
+- Vanish: persistent state, self and target toggles, tab/entity hiding, join/leave suppression, ping-count filtering, admin marker, and locator-bar hiding where supported.
+- Inspect and find commands for player details and inventory/ender-chest searches.
+- Persistent freeze with movement, block-break, use, and attack blocking.
+- Timed item bans with action blocking and optional inventory confiscation.
+- New-player alerts, scheduled announcements, customizable join/leave messages, and rotating server-list MOTDs.
+- Optional LuckPerms integration and vanilla operator fallback.
+- Per-module JSON configuration in `config/fiw-admin/` with live `/fiw reload`.
+- Shared integration tests for config creation and persistent state.
+
+### Known limitations
+
+- Vanish is visual/packet based: sounds and particles can still happen, mobs can still target vanished players, and sleep skipping still counts them.
+- BanItem does not block crafting the item.

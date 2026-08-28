@@ -1,0 +1,18 @@
+* text=auto eol=lf
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+gradlew text eol=lf
+
+*.jar binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.ogg binary
+
+gradle/wrapper/** linguist-vendored
+gradlew linguist-vendored
+gradlew.bat linguist-vendored
+*.md linguist-documentation

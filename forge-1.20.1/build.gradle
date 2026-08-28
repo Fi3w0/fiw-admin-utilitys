@@ -1,0 +1,85 @@
+plugins {
+    id 'java'
+    id 'net.minecraftforge.gradle' version '[6.0.24,6.2)'
+}
+
+def targetProperties = new Properties()
+file('gradle.properties').withInputStream { targetProperties.load(it) }
+targetProperties.each { key, value -> project.ext.set(key.toString(), value) }
+
+evaluationDependsOn(':core')
+
+base {
+    archivesName = "${project.archives_base_name}-forge-${project.minecraft_version}"
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(project.java_version as int)
+    }
+
+    withSourcesJar()
+}
+
+sourceSets {
+    main {
+        java.srcDir rootProject.file('common-1.20.1/src/main/java')
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+minecraft {
+    mappings channel: 'official', version: project.minecraft_version
+    copyIdeResources = true
+
+    runs {
+        client {
+            workingDirectory project.file('run')
+            mods { fiw_admin_tools { source sourceSets.main } }
+        }
+        server {
+            workingDirectory project.file('run')
+            mods { fiw_admin_tools { source sourceSets.main } }
+        }
+    }
+}
+
+dependencies {
+    minecraft "net.minecraftforge:forge:${project.minecraft_version}-${project.forge_version}"
+    implementation project(':core')
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = project.java_version as int
+    options.encoding = 'UTF-8'
+}
+
+tasks.named('processResources', ProcessResources).configure {
+    def properties = [
+            version                : project.version,
+            neoforge_mod_id        : project.neoforge_mod_id,
+            mod_name               : project.mod_name,
+            mod_description        : project.mod_description,
+            mod_license            : project.mod_license,
+            mod_author             : project.mod_author,
+            minecraft_version_range: project.minecraft_version_range,
+            loader_version_range   : project.loader_version_range
+    ]
+
+    inputs.properties(properties)
+
+    filesMatching('META-INF/mods.toml') {
+        expand properties
+    }
+}
+
+jar {
+    from project(':core').sourceSets.main.output
+    manifest {
+        attributes 'MixinConfigs': 'fiw_admin_tools.mixins.json'
+    }
+    finalizedBy 'reobfJar'
+}

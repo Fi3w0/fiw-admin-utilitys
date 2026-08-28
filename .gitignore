@@ -1,0 +1,49 @@
+.gradle/
+/build/
+/*/build/
+/run/
+/*/run/
+*.log
+*.log.gz
+.DS_Store
+*/.DS_Store
+
+# IDE and local tooling
+.idea/
+.vscode/
+.kotlin/
+.claude/
+*.iml
+
+# Local release artifacts and runtime data
+/jars/
+/Jar/
+/release/
+/RELEASE_NOTES.md
+/config/
+/world/
+/crash-reports/
+eula.txt
+ops.json
+whitelist.json
+banned-ips.json
+banned-players.json
+usercache.json
+
+# Retained pre-multiversion source snapshot; active sources live in modules
+/src/
+
+# Local agent context (never publish)
+AGENT.md
+AGENTS.md
+CLAUDE.md
+.github/copilot-instructions.md
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.token
+*.secret
+*.pem
+*.key

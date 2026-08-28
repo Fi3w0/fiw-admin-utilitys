@@ -1,0 +1,134 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag or version to publish (for example v1.1.0 or 1.1.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17, 21, and 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: |
+            17
+            21
+            25
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Resolve requested version
+        id: version
+        run: |
+          RAW="${{ inputs.tag }}"
+          TAG="${RAW#refs/tags/}"
+          VERSION="${TAG#v}"
+          TAG="v$VERSION"
+          if [ -z "$VERSION" ]; then
+            echo "A tag or version is required" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Check out requested tag if present
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            git checkout --detach "$TAG"
+          else
+            echo "$TAG does not exist; building the checked-out ref"
+          fi
+
+      - name: Validate project version
+        run: |
+          EXPECTED="${{ steps.version.outputs.version }}"
+          ACTUAL="$(awk -F= '$1 == "mod_version" { print $2 }' gradle.properties)"
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "gradle.properties mod_version is $ACTUAL, expected $EXPECTED" >&2
+            exit 1
+          fi
+
+      - name: Build all eight targets
+        run: ./gradlew build --stacktrace
+        env:
+          JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
+
+      - name: Collect release jars
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          mkdir -p release
+          jars=(
+            "fabric-1.21.11/build/libs/fiw-admin-tools-fabric-1.21.11-$VERSION.jar"
+            "neoforge-1.21.11/build/libs/fiw-admin-tools-neoforge-1.21.11-$VERSION.jar"
+            "fabric-1.21.8/build/libs/fiw-admin-tools-fabric-1.21.8-$VERSION.jar"
+            "neoforge-1.21.8/build/libs/fiw-admin-tools-neoforge-1.21.8-$VERSION.jar"
+            "fabric-1.21.1/build/libs/fiw-admin-tools-fabric-1.21.1-$VERSION.jar"
+            "neoforge-1.21.1/build/libs/fiw-admin-tools-neoforge-1.21.1-$VERSION.jar"
+            "fabric-1.20.1/build/libs/fiw-admin-tools-fabric-1.20.1-$VERSION.jar"
+            "forge-1.20.1/build/libs/fiw-admin-tools-forge-1.20.1-$VERSION.jar"
+          )
+          for jar in "${jars[@]}"; do
+            test -f "$jar"
+            cp -v "$jar" release/
+          done
+          test "$(find release -name '*.jar' | wc -l)" -eq 8
+          ls -la release
+
+      - name: Extract release notes
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          awk -v ver="$VERSION" '
+            /^## \[/ { if (p) exit; if ($0 ~ ("^## \\[" ver "\\]")) p=1 }
+            p { print }
+          ' CHANGELOG.md > RELEASE_NOTES.md
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "Fiw Admin Tools $VERSION" > RELEASE_NOTES.md
+          fi
+
+      - name: Ensure release tag
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          if git tag --list "$TAG" | grep -qx "$TAG"; then
+            echo "$TAG already exists"
+          else
+            git config user.name "Fi3w0"
+            git config user.email "fi3w0@users.noreply.github.com"
+            git tag -a "$TAG" -m "Release $TAG"
+            git push origin "$TAG"
+          fi
+
+      - name: Publish or update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG="${{ steps.version.outputs.tag }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" release/*.jar --clobber
+          else
+            gh release create "$TAG" release/*.jar \
+              --title "Fiw Admin Tools $VERSION" \
+              --notes-file RELEASE_NOTES.md \
+              --verify-tag \
+              --latest
+          fi
+
+      - name: Publish Modrinth versions and sync description
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_API_KEY }}
+        run: bash .github/scripts/publish-modrinth.sh

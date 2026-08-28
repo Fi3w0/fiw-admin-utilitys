@@ -1,0 +1,81 @@
+name: Bug report
+description: Report a crash, incorrect command, config problem, or server behavior issue.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Logs and the affected `config/fiw-admin/*.json` file are the most useful details.
+
+  - type: dropdown
+    id: target
+    attributes:
+      label: Loader and Minecraft version
+      options:
+        - Fabric 1.21.11
+        - NeoForge 1.21.11
+        - Fabric 1.21.8
+        - NeoForge 1.21.8
+        - Fabric 1.21.1
+        - NeoForge 1.21.1
+        - Fabric 1.20.1
+        - Forge 1.20.1
+    validations:
+      required: true
+
+  - type: input
+    id: mod_version
+    attributes:
+      label: Fiw Admin Tools version
+      placeholder: "1.1.0"
+    validations:
+      required: true
+
+  - type: input
+    id: loader_version
+    attributes:
+      label: Loader and API versions
+      placeholder: "Fabric Loader 0.19.2 + Fabric API 0.141.4, or NeoForge 21.8.53"
+
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened?
+      description: Describe the actual result and what you expected.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start the server with ...
+        2. Run /fiw ...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Relevant config
+      description: Remove webhook URLs or other secrets before pasting.
+      render: json
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Server log or crash report
+      description: Paste the relevant section or attach the full file.
+      render: text
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I removed tokens, webhook URLs, IP addresses, and other secrets.
+          required: true
+        - label: I searched existing issues and this is not a duplicate.
+          required: true

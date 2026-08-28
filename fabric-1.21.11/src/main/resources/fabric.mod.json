@@ -1,0 +1,36 @@
+{
+	"schemaVersion": 1,
+	"id": "${mod_id}",
+	"version": "${version}",
+	"name": "${mod_name}",
+	"description": "${mod_description}",
+	"authors": [
+		"${mod_author}"
+	],
+	"contact": {
+		"homepage": "https://modrinth.com/mod/fiw-admin-utilitys",
+		"sources": "https://github.com/Fi3w0/fiw-admin-utilitys",
+		"issues": "https://github.com/Fi3w0/fiw-admin-utilitys/issues"
+	},
+	"license": "${mod_license}",
+	"icon": "assets/fiw-admin-tools/icon.png",
+	"environment": "server",
+	"entrypoints": {
+		"main": [
+			{
+				"value": "com.fiw.fabric.FiwAdminToolsFabric",
+				"adapter": "kotlin"
+			}
+		]
+	},
+	"mixins": [
+		"fiw_admin_tools.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=${loader_version}",
+		"minecraft": "~${minecraft_version}",
+		"java": ">=${java_version}",
+		"fabric-api": "*",
+		"fabric-language-kotlin": "*"
+	}
+}
