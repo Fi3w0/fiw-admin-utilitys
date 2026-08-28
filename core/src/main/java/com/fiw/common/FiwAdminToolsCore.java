@@ -18,6 +18,9 @@ public final class FiwAdminToolsCore {
     private final NewPlayerService newPlayerService;
     private final BanItemService banItemService;
     private final MessagesService messagesService;
+    private final PunishmentService punishmentService;
+    private final ReportService reportService;
+    private final AfkService afkService;
 
     private FiwAdminToolsCore(FiwPlatform platform) {
         this.platform = platform;
@@ -31,6 +34,9 @@ public final class FiwAdminToolsCore {
         this.newPlayerService = new NewPlayerService(platform);
         this.banItemService = new BanItemService(platform);
         this.messagesService = new MessagesService(platform);
+        this.punishmentService = new PunishmentService(platform);
+        this.reportService = new ReportService(platform);
+        this.afkService = new AfkService(platform);
     }
 
     public static FiwAdminToolsCore bootstrap(FiwPlatform platform) {
@@ -54,7 +60,11 @@ public final class FiwAdminToolsCore {
                 "BanItem: " + (banItemService.config().enabled ? "on" : "off") + " (" + banItemService.activeBanCount() + " banned)",
                 "Messages: join/leave " + (messagesService.config().joinLeave.enabled ? "on" : "off")
                         + ", motd rotation " + (messagesService.config().motd.enabled ? "on" : "off")
-                        + " (" + messagesService.config().motd.motds.size() + " motds)"
+                        + " (" + messagesService.config().motd.motds.size() + " motds)",
+                "Punishment: " + (punishmentService.config().enabled ? "on" : "off"),
+                "Report: " + (reportService.config().enabled ? "on" : "off")
+                        + " (" + reportService.openReports().size() + " open)",
+                "AFK: " + (afkService.config().enabled ? "on" : "off") + " (" + afkService.afkPlayers().size() + " afk)"
         );
     }
 
@@ -69,6 +79,9 @@ public final class FiwAdminToolsCore {
         newPlayerService.reload();
         banItemService.reload();
         messagesService.reload();
+        punishmentService.reload();
+        reportService.reload();
+        afkService.reload();
         return "Reloaded fiw admin tools config.";
     }
 
@@ -110,5 +123,17 @@ public final class FiwAdminToolsCore {
 
     public MessagesService messages() {
         return messagesService;
+    }
+
+    public PunishmentService punishment() {
+        return punishmentService;
+    }
+
+    public ReportService report() {
+        return reportService;
+    }
+
+    public AfkService afk() {
+        return afkService;
     }
 }

@@ -31,15 +31,23 @@ public final class Durations {
             case "s", "sec", "secs" -> amount;
             case "m", "min", "mins" -> amount * 60;
             case "h", "hr", "hrs" -> amount * 3600;
+            case "d", "day", "days" -> amount * 86400;
+            case "w", "week", "weeks" -> amount * 604800;
             default -> -1;
         };
-        if (seconds <= 0 || seconds > 24 * 3600) {
+        if (seconds <= 0 || seconds > 365L * 86400) {
             return -1;
         }
         return (int) seconds;
     }
 
     public static String format(int seconds) {
+        if (seconds >= 604800 && seconds % 604800 == 0) {
+            return (seconds / 604800) + "w";
+        }
+        if (seconds >= 86400 && seconds % 86400 == 0) {
+            return (seconds / 86400) + "d";
+        }
         if (seconds >= 3600 && seconds % 3600 == 0) {
             return (seconds / 3600) + "h";
         }
