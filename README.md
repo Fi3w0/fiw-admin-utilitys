@@ -100,7 +100,7 @@ Durations accept values such as `30s`, `5m`, `1h`, `1d`, or `1w`. `/fiw ban`/`/f
 
 ## Configuration
 
-Files are generated in `config/fiw-admin/`. Run `/fiw reload` after editing them.
+Files are generated in `config/fiw-admin/`. Run `/fiw reload` after editing them. See **[CONFIG.md](CONFIG.md)** for a full field-by-field reference (every option, its default, and what it does) — the table below is just an index of which file covers what.
 
 | File | Purpose |
 |---|---|
