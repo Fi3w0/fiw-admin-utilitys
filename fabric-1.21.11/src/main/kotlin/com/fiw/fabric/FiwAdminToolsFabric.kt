@@ -54,30 +54,46 @@ object FiwAdminToolsFabric : ModInitializer {
 		ServerMessageEvents.ALLOW_GAME_MESSAGE.register { server, message, overlay ->
 			!runtime.shouldSuppressGameMessage(server, message, overlay)
 		}
+		ServerMessageEvents.ALLOW_CHAT_MESSAGE.register { _, sender, _ ->
+			!runtime.shouldBlockChat(sender)
+		}
 		PlayerBlockBreakEvents.BEFORE.register { _, player, _, _, _ ->
+			if (player is ServerPlayer) runtime.recordActivity(player)
 			!(player is ServerPlayer && (runtime.shouldBlockInteraction(player)
 					|| runtime.shouldBlockItemUse(player, player.mainHandItem)))
 		}
 		UseBlockCallback.EVENT.register { player, _, hand, _ ->
-			if (player is ServerPlayer && (runtime.shouldBlockInteraction(player)
-							|| runtime.shouldBlockItemUse(player, player.getItemInHand(hand)))) {
-				InteractionResult.FAIL
+			if (player is ServerPlayer) {
+				runtime.recordActivity(player)
+				if (runtime.shouldBlockInteraction(player) || runtime.shouldBlockItemUse(player, player.getItemInHand(hand))) {
+					InteractionResult.FAIL
+				} else {
+					InteractionResult.PASS
+				}
 			} else {
 				InteractionResult.PASS
 			}
 		}
 		UseItemCallback.EVENT.register { player, _, hand ->
-			if (player is ServerPlayer && (runtime.shouldBlockInteraction(player)
-							|| runtime.shouldBlockItemUse(player, player.getItemInHand(hand)))) {
-				InteractionResult.FAIL
+			if (player is ServerPlayer) {
+				runtime.recordActivity(player)
+				if (runtime.shouldBlockInteraction(player) || runtime.shouldBlockItemUse(player, player.getItemInHand(hand))) {
+					InteractionResult.FAIL
+				} else {
+					InteractionResult.PASS
+				}
 			} else {
 				InteractionResult.PASS
 			}
 		}
 		AttackEntityCallback.EVENT.register { player, _, _, _, _ ->
-			if (player is ServerPlayer && (runtime.shouldBlockInteraction(player)
-							|| runtime.shouldBlockItemUse(player, player.mainHandItem))) {
-				InteractionResult.FAIL
+			if (player is ServerPlayer) {
+				runtime.recordActivity(player)
+				if (runtime.shouldBlockInteraction(player) || runtime.shouldBlockItemUse(player, player.mainHandItem)) {
+					InteractionResult.FAIL
+				} else {
+					InteractionResult.PASS
+				}
 			} else {
 				InteractionResult.PASS
 			}
