@@ -21,6 +21,8 @@ public final class FiwAdminToolsCore {
     private final PunishmentService punishmentService;
     private final ReportService reportService;
     private final AfkService afkService;
+    private final WatchdogService watchdogService;
+    private final DupeService dupeService;
 
     private FiwAdminToolsCore(FiwPlatform platform) {
         this.platform = platform;
@@ -37,6 +39,8 @@ public final class FiwAdminToolsCore {
         this.punishmentService = new PunishmentService(platform);
         this.reportService = new ReportService(platform);
         this.afkService = new AfkService(platform);
+        this.watchdogService = new WatchdogService(platform);
+        this.dupeService = new DupeService(platform);
     }
 
     public static FiwAdminToolsCore bootstrap(FiwPlatform platform) {
@@ -64,7 +68,10 @@ public final class FiwAdminToolsCore {
                 "Punishment: " + (punishmentService.config().enabled ? "on" : "off"),
                 "Report: " + (reportService.config().enabled ? "on" : "off")
                         + " (" + reportService.openReports().size() + " open)",
-                "AFK: " + (afkService.config().enabled ? "on" : "off") + " (" + afkService.afkPlayers().size() + " afk)"
+                "AFK: " + (afkService.config().enabled ? "on" : "off") + " (" + afkService.afkPlayers().size() + " afk)",
+                "Watchdog: " + (watchdogService.config().enabled ? "on" : "off"),
+                "Dupe: " + (dupeService.config().enabled ? "on" : "off")
+                        + " (" + dupeService.recentAlerts().size() + " logged alerts)"
         );
     }
 
@@ -82,6 +89,8 @@ public final class FiwAdminToolsCore {
         punishmentService.reload();
         reportService.reload();
         afkService.reload();
+        watchdogService.reload();
+        dupeService.reload();
         return "Reloaded fiw admin tools config.";
     }
 
@@ -135,5 +144,13 @@ public final class FiwAdminToolsCore {
 
     public AfkService afk() {
         return afkService;
+    }
+
+    public WatchdogService watchdog() {
+        return watchdogService;
+    }
+
+    public DupeService dupe() {
+        return dupeService;
     }
 }
