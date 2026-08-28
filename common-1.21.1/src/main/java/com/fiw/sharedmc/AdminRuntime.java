@@ -3,6 +3,8 @@ package com.fiw.sharedmc;
 import com.fiw.common.AfkConfig;
 import com.fiw.common.AlertConfig;
 import com.fiw.common.AlertHistory;
+import com.fiw.common.DupeConfig;
+import com.fiw.common.DupeService;
 import com.fiw.common.Durations;
 import com.fiw.common.FiwAdminToolsCore;
 import com.fiw.common.FreezeConfig;
@@ -89,6 +91,8 @@ public final class AdminRuntime {
     private static final String PERMISSION_REPORT_MANAGE = "fiw.report.manage";
     private static final String PERMISSION_AFK_USE = "fiw.afk.use";
     private static final String PERMISSION_AFK_MANAGE = "fiw.afk.manage";
+    private static final String PERMISSION_WATCHDOG_NOTIFY = "fiw.watchdog.notify";
+    private static final String PERMISSION_DUPE_MANAGE = "fiw.dupe.manage";
     private static final DateTimeFormatter SEEN_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private static final int[] COUNTDOWN_STEPS = {3600, 1800, 1200, 600, 300, 120, 60, 30, 10, 5, 4, 3, 2, 1};
 
@@ -97,6 +101,8 @@ public final class AdminRuntime {
     private String originalMotd;
     private int tickCounter;
     private int itemCleanCountdownSeconds = -1;
+    private int dupeScanCountdownSeconds = -1;
+    private long dupeGraceUntilMillis;
     private long lastAlertTick = -200;
     private int maintenanceCountdownSeconds = -1;
     private String maintenanceCountdownMessage;
@@ -144,7 +150,9 @@ public final class AdminRuntime {
                 .then(punishCommand())
                 .then(historyCommand())
                 .then(reportsCommand())
-                .then(afkCommand()));
+                .then(afkCommand())
+                .then(watchdogCommand())
+                .then(dupeCommand()));
         dispatcher.register(Commands.literal("report")
                 .requires(source -> access.hasPermission(source, PERMISSION_REPORT_USE, 0))
                 .then(Commands.argument("target", StringArgumentType.word())
@@ -155,8 +163,18 @@ public final class AdminRuntime {
     }
 
     public void onServerStarted(MinecraftServer server) {
+        core.watchdog().onServerStarted();
+        armDupeGracePeriod();
         applyMaintenanceMotd(server);
         resetSweepTimer();
+    }
+
+    public void onServerStopping(MinecraftServer server) {
+        core.watchdog().onServerStopping();
+    }
+
+    private void armDupeGracePeriod() {
+        dupeGraceUntilMillis = System.currentTimeMillis() + Math.max(0, core.dupe().config().gracePeriodSecondsAfterStart) * 1000L;
     }
 
     public void onPlayerJoin(MinecraftServer server, ServerPlayer player) {
@@ -286,6 +304,7 @@ public final class AdminRuntime {
 
     public void onServerTick(MinecraftServer server) {
         tickCounter++;
+        core.watchdog().recordHeartbeat();
         tickFreeze(server);
         if (tickCounter % 20 != 0) {
             return;
@@ -294,6 +313,7 @@ public final class AdminRuntime {
         tickMaintenanceCountdown(server);
         tickAnnouncements(server);
         tickBanItems(server);
+        tickDupeScan(server);
         tickMotdRotation(server);
         tickSweep(server);
         tickAlert(server);
@@ -480,6 +500,23 @@ public final class AdminRuntime {
                         .executes(context -> listAfk(context.getSource())));
     }
 
+    private com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> watchdogCommand() {
+        return Commands.literal("watchdog")
+                .requires(source -> access.hasPermission(source, PERMISSION_WATCHDOG_NOTIFY, 3))
+                .executes(context -> sendWatchdogStatus(context.getSource()));
+    }
+
+    private com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> dupeCommand() {
+        return Commands.literal("dupe")
+                .requires(source -> access.hasPermission(source, PERMISSION_DUPE_MANAGE, 3))
+                .executes(context -> sendDupeStatus(context.getSource()))
+                .then(Commands.literal("status").executes(context -> sendDupeStatus(context.getSource())))
+                .then(Commands.literal("alerts").executes(context -> sendDupeAlerts(context.getSource())))
+                .then(Commands.literal("clear")
+                        .then(Commands.argument("player", GameProfileArgument.gameProfile())
+                                .executes(context -> clearDupeHistory(context.getSource(), GameProfileArgument.getGameProfiles(context, "player")))));
+    }
+
     private com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> sweepCommand() {
         return Commands.literal("sweep")
                 .requires(source -> access.hasPermission(source, PERMISSION_SWEEP_MANAGE, 3))
@@ -521,6 +558,7 @@ public final class AdminRuntime {
         resetSweepTimer();
         announceCountdownSeconds = -1;
         motdRotateCountdownSeconds = -1;
+        armDupeGracePeriod();
         applyMaintenanceMotd(source.getServer());
         syncVanishForAll(source.getServer());
         source.sendSuccess(() -> Component.literal(message), false);
@@ -1769,6 +1807,215 @@ public final class AdminRuntime {
             source.sendSuccess(() -> Component.literal("- " + name + " (idle " + idleText + ")"), false);
         }
         return afk.size();
+    }
+
+    private int sendWatchdogStatus(CommandSourceStack source) {
+        var config = core.watchdog().config();
+        source.sendSuccess(() -> Component.literal("Watchdog: " + (config.enabled ? "on" : "off")), false);
+        source.sendSuccess(() -> Component.literal("Heartbeat age: " + core.watchdog().heartbeatAgeSeconds()
+                + "s (hang alert at " + config.heartbeatTimeoutSeconds + "s)"), false);
+        source.sendSuccess(() -> Component.literal("Crash-on-boot alert: " + (config.crashAlertOnBoot ? "on" : "off")), false);
+        return 1;
+    }
+
+    private int sendDupeStatus(CommandSourceStack source) {
+        DupeConfig config = core.dupe().config();
+        source.sendSuccess(() -> Component.literal("Dupe detection: " + (config.enabled ? "on" : "off")), false);
+        source.sendSuccess(() -> Component.literal("Rate detector: " + (config.rateDetector.enabled ? "on" : "off")
+                + " (threshold " + config.rateDetector.threshold + " / " + config.rateDetector.windowSeconds
+                + "s, response " + config.rateDetector.response.tier + ")"), false);
+        source.sendSuccess(() -> Component.literal("Chunk scope: " + (config.rateDetector.chunkScope.enabled ? "on" : "off")), false);
+        source.sendSuccess(() -> Component.literal("Signature detector: " + (config.signatureDetector.enabled ? "on" : "off")
+                + " (" + config.signatureDetector.watchList.size() + " watched item(s), response "
+                + config.signatureDetector.response.tier + ")"), false);
+        return 1;
+    }
+
+    private int sendDupeAlerts(CommandSourceStack source) {
+        List<DupeService.DupeAlertLog.Entry> recent = core.dupe().recentAlerts();
+        if (recent.isEmpty()) {
+            source.sendSuccess(() -> Component.literal("No dupe alerts logged."), false);
+            return 1;
+        }
+        int start = Math.max(0, recent.size() - 20);
+        int shown = recent.size() - start;
+        source.sendSuccess(() -> Component.literal("Recent dupe alerts (" + shown + " of " + recent.size() + "):"), false);
+        for (DupeService.DupeAlertLog.Entry entry : recent.subList(start, recent.size())) {
+            String line = "- [" + entry.detector + "] " + entry.detail;
+            source.sendSuccess(() -> Component.literal(line), false);
+        }
+        return recent.size();
+    }
+
+    private int clearDupeHistory(CommandSourceStack source, Collection<GameProfile> targets) {
+        int count = 0;
+        for (GameProfile target : targets) {
+            core.dupe().clearHistory(target.getId().toString());
+            count++;
+        }
+        int total = count;
+        source.sendSuccess(() -> Component.literal("Cleared dupe rate history for " + total + " player(s)."), true);
+        return count;
+    }
+
+    private void tickDupeScan(MinecraftServer server) {
+        int intervalSeconds = Math.max(1, core.dupe().config().scanIntervalSeconds);
+        if (dupeScanCountdownSeconds > 0) {
+            dupeScanCountdownSeconds--;
+            return;
+        }
+        dupeScanCountdownSeconds = intervalSeconds;
+        tickDupeDetection(server);
+    }
+
+    private void tickDupeDetection(MinecraftServer server) {
+        DupeConfig config = core.dupe().config();
+        if (!config.enabled || System.currentTimeMillis() < dupeGraceUntilMillis) {
+            return;
+        }
+        if (config.rateDetector.enabled) {
+            scanRateDetector(server, config);
+        }
+        if (config.signatureDetector.enabled && !config.signatureDetector.watchList.isEmpty()) {
+            scanSignatureDetector(server, config);
+        }
+    }
+
+    private void scanRateDetector(MinecraftServer server, DupeConfig config) {
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            double value = weighFromWatchList(player.getInventory().items, config.rateDetector.watchList);
+            String key = player.getGameProfile().getId().toString();
+            double increase = core.dupe().rateIncrease(key, value, config.rateDetector.windowSeconds);
+            if (increase < config.rateDetector.threshold) {
+                continue;
+            }
+            if (config.rateDetector.exemptWhileContainerOpen && player.containerMenu != player.inventoryMenu) {
+                continue;
+            }
+            String detail = player.getGameProfile().getName() + " gained " + String.format(Locale.ROOT, "%.1f", increase)
+                    + " weighted watch-list value in " + config.rateDetector.windowSeconds
+                    + "s (threshold " + config.rateDetector.threshold + ").";
+            applyDupeResponse(server, player.getGameProfile().getId(), player.getGameProfile().getName(), "rate", detail, config.rateDetector.response);
+        }
+        if (config.rateDetector.chunkScope.enabled) {
+            scanRateDetectorChunks(server, config);
+        }
+    }
+
+    private double weighFromWatchList(Iterable<ItemStack> items, List<DupeConfig.WatchEntry> watchList) {
+        double total = 0;
+        for (ItemStack stack : items) {
+            if (stack.isEmpty()) {
+                continue;
+            }
+            String id = itemId(stack);
+            for (DupeConfig.WatchEntry entry : watchList) {
+                if (id.equals(entry.itemId)) {
+                    total += entry.weight * stack.getCount();
+                    break;
+                }
+            }
+        }
+        return total;
+    }
+
+    private void scanRateDetectorChunks(MinecraftServer server, DupeConfig config) {
+        Map<String, Double> chunkValues = new HashMap<>();
+        for (ServerLevel level : server.getAllLevels()) {
+            String dimension = level.dimension().location().toString();
+            for (Entity entity : level.getAllEntities()) {
+                if (!(entity instanceof ItemEntity itemEntity)) {
+                    continue;
+                }
+                ItemStack stack = itemEntity.getItem();
+                if (stack.isEmpty()) {
+                    continue;
+                }
+                String id = itemId(stack);
+                for (DupeConfig.WatchEntry entry : config.rateDetector.watchList) {
+                    if (!id.equals(entry.itemId)) {
+                        continue;
+                    }
+                    ChunkPos pos = itemEntity.chunkPosition();
+                    String key = dimension + ":" + chunkX(pos) + ":" + chunkZ(pos);
+                    chunkValues.merge(key, entry.weight * stack.getCount(), Double::sum);
+                    break;
+                }
+            }
+        }
+        double chunkThreshold = config.rateDetector.threshold * config.rateDetector.chunkScope.thresholdMultiplier;
+        for (Map.Entry<String, Double> entry : chunkValues.entrySet()) {
+            double increase = core.dupe().rateIncrease("chunk:" + entry.getKey(), entry.getValue(), config.rateDetector.windowSeconds);
+            if (increase < chunkThreshold) {
+                continue;
+            }
+            String detail = "Chunk " + entry.getKey() + " gained " + String.format(Locale.ROOT, "%.1f", increase)
+                    + " weighted dropped-item value in " + config.rateDetector.windowSeconds
+                    + "s (threshold " + chunkThreshold + ").";
+            applyDupeResponse(server, null, entry.getKey(), "rate-chunk", detail, config.rateDetector.response);
+        }
+    }
+
+    private void scanSignatureDetector(MinecraftServer server, DupeConfig config) {
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            for (ItemStack stack : player.getInventory().items) {
+                if (stack.isEmpty()) {
+                    continue;
+                }
+                String id = itemId(stack);
+                if (!config.signatureDetector.watchList.contains(id)) {
+                    continue;
+                }
+                String signature = id + "#" + stack.getComponentsPatch();
+                String conflictHolder = core.dupe().checkAndUpdateSignature(
+                        signature, player.getGameProfile().getId().toString(), config.scanIntervalSeconds);
+                if (conflictHolder != null) {
+                    String detail = "Item " + id + " appears to be held by both " + conflictHolder + " and "
+                            + player.getGameProfile().getName() + " (" + player.getGameProfile().getId() + ") within the same scan window.";
+                    applyDupeResponse(server, player.getGameProfile().getId(), player.getGameProfile().getName(),
+                            "signature", detail, config.signatureDetector.response);
+                }
+            }
+        }
+    }
+
+    private void applyDupeResponse(MinecraftServer server, UUID target, String targetLabel, String detector, String detail, DupeConfig.Response response) {
+        core.dupe().recordAlert(detector, detail);
+        access.log("[dupe] " + detail);
+        DupeConfig.Tier tier = response.tier;
+        boolean punitive = tier == DupeConfig.Tier.FREEZE || tier == DupeConfig.Tier.KICK
+                || tier == DupeConfig.Tier.TEMPBAN || tier == DupeConfig.Tier.BAN;
+        if (punitive && target == null) {
+            tier = DupeConfig.Tier.ALERT;
+        }
+        if (tier == DupeConfig.Tier.DISCORD || punitive) {
+            core.dupe().notifyDiscord(detail);
+        }
+        if (tier != DupeConfig.Tier.LOG) {
+            Component component = Component.literal(TextFormat.legacyColors("&7[Dupe] &f" + detail));
+            for (ServerPlayer online : server.getPlayerList().getPlayers()) {
+                if (access.hasPermission(online, core.dupe().config().notifyPermission, 3)) {
+                    online.sendSystemMessage(component);
+                }
+            }
+        }
+        String staffName = "Dupe-" + detector;
+        String reason = "Automatic dupe detection: " + detail;
+        switch (tier) {
+            case FREEZE -> {
+                ServerPlayer targetPlayer = server.getPlayerList().getPlayer(target);
+                if (targetPlayer != null && core.freeze().config().enabled && !core.freeze().isFrozen(target)) {
+                    String evidence = buildFreezeEvidence(targetPlayer);
+                    core.freeze().freeze(target, targetLabel, staffName, reason, 0, evidence);
+                    anchorFrozenPlayer(targetPlayer);
+                }
+            }
+            case KICK -> applyPunishment(server, target, targetLabel, staffName, PunishKind.KICK, reason, 0);
+            case TEMPBAN -> applyPunishment(server, target, targetLabel, staffName, PunishKind.BAN, reason, response.durationSeconds);
+            case BAN -> applyPunishment(server, target, targetLabel, staffName, PunishKind.BAN, reason, 0);
+            default -> {
+            }
+        }
     }
 
     private int toggleVanish(CommandSourceStack source) {
