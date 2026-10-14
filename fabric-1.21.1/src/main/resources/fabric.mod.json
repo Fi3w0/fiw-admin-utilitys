@@ -18,7 +18,7 @@
 	"entrypoints": {
 		"main": [
 			{
-				"value": "com.fiw.fabric.FiwAdminToolsFabric",
+				"value": "com.fiw.admin.fabric.FiwAdminToolsFabric",
 				"adapter": "kotlin"
 			}
 		]
