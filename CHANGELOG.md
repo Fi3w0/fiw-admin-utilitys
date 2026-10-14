@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.3.1] - Compatibility fix
+
+### Fixed
+
+- Fiw Admin Tools and Tickwatch could not be installed together on NeoForge (the game refused to start because both mods used the same Java package). Admin Tools now uses its own `com.fiw.admin` package. Commands, config files and saved data are unchanged.
+
 ## [1.3.0] - Watchdog and heuristic dupe detection
 
 ### Added
