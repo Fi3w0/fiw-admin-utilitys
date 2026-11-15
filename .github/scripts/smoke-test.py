@@ -40,7 +40,7 @@ def download(url, destination):
 
 
 def java_for(version):
-    for key in [f"JAVA_{version}", f"JAVA_HOME_{version}_X64", f"JAVA_HOME_{version}"]:
+    for key in [f"JAVA_{version}", f"JAVA_HOME_{version}_X64", f"JAVA_HOME_{version}_ARM64", f"JAVA_HOME_{version}"]:
         value = os.environ.get(key)
         if value:
             executable = Path(value)
