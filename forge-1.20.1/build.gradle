@@ -1,6 +1,6 @@
 plugins {
     id 'java'
-    id 'net.minecraftforge.gradle' version '[6.0.24,6.2)'
+    id 'net.neoforged.moddev.legacyforge'
 }
 
 def targetProperties = new Properties()
@@ -31,24 +31,21 @@ repositories {
     mavenCentral()
 }
 
-minecraft {
-    mappings channel: 'official', version: project.minecraft_version
-    copyIdeResources = true
-
+legacyForge {
+    version = "${project.minecraft_version}-${project.forge_version}"
     runs {
-        client {
-            workingDirectory project.file('run')
-            mods { fiw_admin_tools { source sourceSets.main; source project(':core').sourceSets.main } }
-        }
-        server {
-            workingDirectory project.file('run')
-            mods { fiw_admin_tools { source sourceSets.main; source project(':core').sourceSets.main } }
+        client { client() }
+        server { server() }
+    }
+    mods {
+        fiw_admin_tools {
+            sourceSet sourceSets.main
+            sourceSet project(':core').sourceSets.main
         }
     }
 }
 
 dependencies {
-    minecraft "net.minecraftforge:forge:${project.minecraft_version}-${project.forge_version}"
     implementation project(':core')
 }
 
@@ -81,5 +78,11 @@ jar {
     manifest {
         attributes 'MixinConfigs': 'fiw_admin_tools.mixins.json'
     }
-    finalizedBy 'reobfJar'
+}
+
+// Forge 1.20.1 runs SRG names; the Mixin AP must remap string-based selectors too.
+dependencies { annotationProcessor 'org.spongepowered:mixin:0.8.5:processor' }
+mixin {
+    add sourceSets.main, 'fiw_admin_tools.refmap.json'
+    config 'fiw_admin_tools.mixins.json'
 }

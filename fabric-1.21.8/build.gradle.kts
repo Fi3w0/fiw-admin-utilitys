@@ -2,7 +2,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
 
 plugins {
-	id("fabric-loom")
+	id("net.fabricmc.fabric-loom-remap")
 	id("org.jetbrains.kotlin.jvm")
 }
 
