@@ -104,6 +104,7 @@ fabric_dependencies='[
 ]'
 no_dependencies='[]'
 
+publish_version "Fabric 26.1.2" "fabric-26.1.2/build/libs/fiw-admin-tools-fabric-26.1.2-$VERSION.jar" "26.1.2" "fabric" "$fabric_dependencies"
 publish_version "Fabric 1.21.11" "fabric-1.21.11/build/libs/fiw-admin-tools-fabric-1.21.11-$VERSION.jar" "1.21.11" "fabric" "$fabric_dependencies"
 publish_version "NeoForge 1.21.11" "neoforge-1.21.11/build/libs/fiw-admin-tools-neoforge-1.21.11-$VERSION.jar" "1.21.11" "neoforge" "$no_dependencies"
 publish_version "Fabric 1.21.8" "fabric-1.21.8/build/libs/fiw-admin-tools-fabric-1.21.8-$VERSION.jar" "1.21.8" "fabric" "$fabric_dependencies"

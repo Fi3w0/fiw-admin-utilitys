@@ -62,16 +62,35 @@ jobs:
             exit 1
           fi
 
-      - name: Build all eight targets
+      - name: Build all nine targets
         run: ./gradlew build --stacktrace
         env:
-          JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
+          JAVA_HOME: ${{ env.JAVA_HOME_25_X64 }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: .github/player-tests/package-lock.json
+
+      - name: Install pinned player test client
+        run: npm ci --prefix .github/player-tests --ignore-scripts
+
+      - name: Verify production gameplay and restarts
+        run: |
+          source .github/scripts/targets.sh
+          VERSION="$(awk -F= '$1 == "mod_version" {print $2}' gradle.properties)"
+          for target in "${TARGETS[@]}"; do
+            read -r module _ _ <<< "$target"
+            python3 .github/scripts/smoke-test.py "$module" "$(jar_path "$module" "$VERSION")" --player-script .github/player-tests/gameplay.cjs --player-phases first,restart
+          done
 
       - name: Collect release jars
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           mkdir -p release
           jars=(
+            "fabric-26.1.2/build/libs/fiw-admin-tools-fabric-26.1.2-$VERSION.jar"
             "fabric-1.21.11/build/libs/fiw-admin-tools-fabric-1.21.11-$VERSION.jar"
             "neoforge-1.21.11/build/libs/fiw-admin-tools-neoforge-1.21.11-$VERSION.jar"
             "fabric-1.21.8/build/libs/fiw-admin-tools-fabric-1.21.8-$VERSION.jar"
@@ -85,7 +104,7 @@ jobs:
             test -f "$jar"
             cp -v "$jar" release/
           done
-          test "$(find release -name '*.jar' | wc -l)" -eq 8
+          test "$(find release -name '*.jar' | wc -l)" -eq 9
           ls -la release
 
       - name: Extract release notes
@@ -132,3 +151,12 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_API_KEY }}
         run: bash .github/scripts/publish-modrinth.sh
+
+      - name: Retain production verification logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-verification
+          path: build/smoke/**/*.log
+          if-no-files-found: ignore
+          retention-days: 14
