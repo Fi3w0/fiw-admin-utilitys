@@ -203,8 +203,15 @@ public final class FiwAdminToolsNeoForge {
             if (node != null && PermissionAPI.getRegisteredNodes().contains(node) && PermissionAPI.getPermission(player, node)) {
                 return true;
             }
-            return fallbackOpLevel >= 3
-                    && Commands.<CommandSourceStack>hasPermission(Commands.LEVEL_ADMINS).test(player.createCommandSourceStack());
+            if (fallbackOpLevel < 0) return false;
+            if (fallbackOpLevel == 0) return true;
+            var vanillaPermission = switch (fallbackOpLevel) {
+                case 1 -> Commands.LEVEL_MODERATORS;
+                case 2 -> Commands.LEVEL_GAMEMASTERS;
+                case 3 -> Commands.LEVEL_ADMINS;
+                default -> Commands.LEVEL_OWNERS;
+            };
+            return Commands.<CommandSourceStack>hasPermission(vanillaPermission).test(player.createCommandSourceStack());
         }
 
         @Override

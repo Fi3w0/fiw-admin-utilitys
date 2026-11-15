@@ -203,7 +203,7 @@ public final class FiwAdminToolsNeoForge {
             if (node != null && PermissionAPI.getRegisteredNodes().contains(node) && PermissionAPI.getPermission(player, node)) {
                 return true;
             }
-            return fallbackOpLevel >= 3 && player.createCommandSourceStack().hasPermission(3);
+            return fallbackOpLevel >= 0 && player.createCommandSourceStack().hasPermission(fallbackOpLevel);
         }
 
         @Override
