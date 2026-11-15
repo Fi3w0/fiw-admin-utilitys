@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.4.0] - Shared AFK and Fabric 26.1.2
+
+### Added
+- Fabric 26.1.2 (Java 25), completing nine loader/version targets.
+- Shared AFK state with Tickwatch 1.2.0+: configure one timeout in `afk.json`, and manual AFK,
+  tags, auto-kick and time accounting agree. Both mods remain optional to one another.
+- Production-jar boot, connected-client AFK, console-command and restart checks before automatic publishing.
+
+### Fixed
+- Forge/NeoForge honor each command's fallback operator level, including AFK listing at level 2.
+- Forge 1.20.1 now registers the chunk-map accessor used by lag reporting, avoiding a delayed server crash.
+- Camera movement now counts as activity on every loader; passive movement does not.
+- Real activity immediately clears automatic AFK; manual AFK returns are broadcast once.
+- Disabling AFK clears shared state and tags instead of leaving a stale AFK flag.
+
+### Changed
+- Builds run on Java 25; older targets retain their Java 17/21 requirements.
+- Forge 1.20.1 uses ModDevGradle's legacy Forge support so all targets build together.
+
 ## [1.3.1] - Compatibility fix
 
 ### Fixed

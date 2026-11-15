@@ -45,6 +45,7 @@ This mod is **server-side only**. Vanilla clients can join normally.
 
 | Minecraft | Loader | Minimum loader/API | Java | Release jar |
 |---|---|---|---:|---|
+| 26.1.2 | Fabric | Loader 0.19.3, Fabric API 0.148.0 | 25 | `fiw-admin-tools-fabric-26.1.2-<version>.jar` |
 | 1.21.11 | Fabric | Loader 0.19.2, Fabric API 0.141.4 | 21 | `fiw-admin-tools-fabric-1.21.11-<version>.jar` |
 | 1.21.11 | NeoForge | 21.11.45 | 21 | `fiw-admin-tools-neoforge-1.21.11-<version>.jar` |
 | 1.21.8 | Fabric | Loader 0.19.2, Fabric API 0.130.0 | 21 | `fiw-admin-tools-fabric-1.21.8-<version>.jar` |
@@ -77,6 +78,11 @@ Kick, temp-ban/ban, and temp-mute/mute with optional reasons, all logged to a pe
 ### Reports and AFK
 
 Players can flag problems with `/report <player> <reason>` (cooldown-limited); online staff are notified in-chat and optionally on Discord, and can claim/resolve reports with `/fiw reports`. AFK detection tags idle players in the tab list, optionally broadcasts state changes, and can auto-kick after a configurable idle period; players can also self-mark with `/fiw afk`.
+
+With **Tickwatch 1.2.0+**, Admin Tools **1.4.0+** supplies the shared AFK state: `/fiw afk`,
+activity/camera detection, tags, auto-kick and Tickwatch's time accounting agree. Configure AFK
+in `config/fiw-admin/afk.json`; Tickwatch's own AFK timeout is unused while this authority runs.
+Both mods still work independently. Turning off Admin Tools AFK also turns off shared AFK accounting.
 
 ### Watchdog
 
@@ -136,7 +142,7 @@ The mod also owns `alert-history.json`, `vanished-players.json`, `player-seen.js
 
 ## Permissions
 
-LuckPerms is supported when installed. Its explicit allow/deny result is checked first; otherwise the mod uses the loader permission API where available and finally vanilla operator level 3.
+LuckPerms is supported when installed. Its explicit allow/deny result is checked first; otherwise the mod uses the loader permission API where available and finally the command's vanilla operator level.
 
 | Node | Grants |
 |---|---|
@@ -176,13 +182,13 @@ LuckPerms is supported when installed. Its explicit allow/deny result is checked
 
 ## Building from source
 
-The Gradle runtime uses JDK 21 and resolves the Java 17 and 21 toolchains required by individual targets.
+The Gradle runtime uses JDK 25 and resolves Java 17, 21 and 25 for the matching targets.
 
 ```bash
 ./gradlew build
 ```
 
-That command runs the shared tests and creates all eight release jars. Individual targets can be built with tasks such as `./gradlew :fabric-1.21.1:build` or `./gradlew :forge-1.20.1:build`.
+That command runs the shared tests and creates all nine release jars. Individual targets can be built with tasks such as `./gradlew :fabric-1.21.1:build` or `./gradlew :forge-1.20.1:build`.
 
 The project keeps Minecraft-independent configuration and state logic in `core`, exact-version Minecraft integrations in `common-*`, and loader entrypoints in `fabric-*`, `neoforge-*`, and `forge-*`.
 
@@ -196,3 +202,10 @@ The project keeps Minecraft-independent configuration and state logic in `core`,
 ## License
 
 Copyright © Fi3w0. All rights reserved. See [LICENSE](LICENSE).
+
+
+### Automated gameplay checks
+
+With Node 22+ installed, run `./gradlew playerTest -PsmokeTarget=<module>` to test the built
+production jar in a disposable local server, then repeat after a restart. CI runs this check
+for all nine targets and retains logs on failure. Output is under `build/smoke/<module>`.

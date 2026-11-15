@@ -3,14 +3,15 @@
 ## Getting started
 
 1. Fork and clone the repository.
-2. Run `./gradlew build` with JDK 21 as the Gradle runtime.
+2. Run `./gradlew build` with JDK 25 as the Gradle runtime.
 3. Keep loader/version adapters thin and put Minecraft-free behavior in `core`.
 
 ## Supported targets
 
-Every behavior change must keep parity across all eight release jars:
+Every behavior change must keep parity across all nine release jars:
 
 ```text
+Fabric 26.1.2
 Fabric 1.21.11     NeoForge 1.21.11
 Fabric 1.21.8      NeoForge 1.21.8
 Fabric 1.21.1      NeoForge 1.21.1

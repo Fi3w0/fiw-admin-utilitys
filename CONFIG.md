@@ -191,10 +191,15 @@ Crafting a banned item is not blocked yet — see [Known limitations](README.md#
 
 AFK state itself is not persisted — it resets on server restart, so there is no `afk`-related state file.
 
+When Tickwatch 1.2.0+ and Admin Tools 1.4.0+ run together, this file is the shared authority.
+Tickwatch uses Admin Tools' state for time accounting and suspends its own idle timeout.
+`enabled: false` disables shared AFK detection too. Camera rotation and deliberate actions
+count as activity; movement caused by water, pistons or teleporting does not reset the timer.
+
 | Field | Default | Meaning |
 |---|---|---|
 | `enabled` | `true` | Master switch for AFK detection, tagging, and auto-kick. |
-| `idleThresholdSeconds` | `300` | Seconds of no block-break/use/attack/chat/movement before a player is marked AFK. |
+| `idleThresholdSeconds` | `300` | Seconds of no block-break/use/attack/chat/camera input before a player is marked AFK. |
 | `kickAfterSeconds` | `0` | Auto-kick a player after this many idle seconds. `0` = never auto-kick. |
 | `tag` | `"&7[AFK]&r"` | Prefix shown before an AFK player's name in the tab list. |
 | `exemptPermission` | `"fiw.afk.exempt"` | Permission that exempts a player from auto-kick (they can still be tagged AFK). |

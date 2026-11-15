@@ -14,18 +14,22 @@
 - **Presence:** custom join/leave messages, rotating MOTDs, announcements, and first-join alerts.
 - **Configuration:** independent JSON settings per module with live `/fiw reload`.
 
-All tools live under the `/fiw` command tree. LuckPerms is supported, with loader permissions and vanilla operator level 3 as fallbacks.
+All tools live under the `/fiw` command tree. LuckPerms is supported, with loader permissions and each command's vanilla operator level as fallbacks.
 
 ## Supported versions
 
 | Minecraft | Loaders |
 |---|---|
+| 26.1.2 | Fabric (Java 25) |
 | 1.21.11 | Fabric, NeoForge |
 | 1.21.8 | Fabric, NeoForge |
 | 1.21.1 | Fabric, NeoForge |
 | 1.20.1 | Fabric, Forge |
 
 NeoForge does not provide a maintained 1.20.1 release line, so that Minecraft version uses Forge.
+
+With Tickwatch 1.2.0+, Admin Tools 1.4.0+ provides one shared AFK state. Configure AFK in
+`config/fiw-admin/afk.json`; `/fiw afk`, tags, auto-kick and tracked AFK time stay in sync.
 
 ## Installation
 
