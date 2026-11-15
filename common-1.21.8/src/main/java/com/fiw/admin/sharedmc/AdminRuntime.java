@@ -1,6 +1,7 @@
 package com.fiw.admin.sharedmc;
 
 import com.fiw.admin.common.AfkConfig;
+import com.fiw.admin.api.AdminAfkApi;
 import com.fiw.admin.common.AlertConfig;
 import com.fiw.admin.common.AlertHistory;
 import com.fiw.admin.common.DupeConfig;
@@ -164,6 +165,7 @@ public final class AdminRuntime {
     }
 
     public void onServerStarted(MinecraftServer server) {
+        AdminAfkApi.start(core.afk());
         core.watchdog().onServerStarted();
         armDupeGracePeriod();
         applyMaintenanceMotd(server);
@@ -171,6 +173,7 @@ public final class AdminRuntime {
     }
 
     public void onServerStopping(MinecraftServer server) {
+        AdminAfkApi.stop(core.afk());
         core.watchdog().onServerStopping();
     }
 
@@ -311,6 +314,9 @@ public final class AdminRuntime {
         tickCounter++;
         core.watchdog().recordHeartbeat();
         tickFreeze(server);
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            core.afk().observeRotation(player.getGameProfile().getId(), player.getYRot(), player.getXRot());
+        }
         if (tickCounter % 20 != 0) {
             return;
         }
@@ -1520,9 +1526,6 @@ public final class AdminRuntime {
 
     private void tickAfk(MinecraftServer server) {
         AfkConfig config = core.afk().config();
-        if (!config.enabled) {
-            return;
-        }
         for (UUID uuid : core.afk().refresh()) {
             ServerPlayer player = server.getPlayerList().getPlayer(uuid);
             String name = player != null ? player.getGameProfile().getName() : "A player";
@@ -1535,7 +1538,7 @@ public final class AdminRuntime {
                 }
             }
         }
-        if (config.kickAfterSeconds > 0) {
+        if (config.enabled && config.kickAfterSeconds > 0) {
             for (ServerPlayer player : server.getPlayerList().getPlayers()) {
                 UUID uuid = player.getGameProfile().getId();
                 if (!core.afk().isAfk(uuid) || access.hasPermission(player, config.exemptPermission, -1)) {
