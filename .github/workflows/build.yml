@@ -1,24 +1,36 @@
-name: build
+name: Build
 
+# Builds every release jar, then boots each one in a real server and plays it with a headless
+# client. Auto release publishes a new version only after every job here succeeded.
 on:
   push:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        description: Commit, tag or branch to build (default is the triggering ref)
+        type: string
+        default: ''
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
+    name: Build all targets
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      targets: ${{ steps.jars.outputs.targets }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
-          fetch-depth: 0
+          ref: ${{ inputs.ref }}
 
-      - name: Set up JDK 17, 21, and 25
-        uses: actions/setup-java@v4
+      # Gradle runs on the last JDK listed; toolchains use the others for older game versions.
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: |
@@ -26,143 +38,73 @@ jobs:
             21
             25
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v5
 
-      - name: Build all nine targets and run core tests
+      - name: Build every target and run unit tests
         run: ./gradlew build --stacktrace
-        env:
-          JAVA_HOME: ${{ env.JAVA_HOME_25_X64 }}
 
-      - uses: actions/setup-node@v4
+      - name: Collect release jars
+        id: jars
+        run: |
+          source .github/scripts/common.sh
+          echo "targets=$(target_modules_json)" >> "$GITHUB_OUTPUT"
+          VERSION="$(mod_version)" bash .github/scripts/collect-jars.sh
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: jars
+          path: release/*.jar
+          if-no-files-found: error
+
+  verify:
+    name: Verify ${{ matrix.target }}
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.build.outputs.targets) }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: |
+            17
+            21
+            25
+
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: .github/player-tests/package-lock.json
 
-      - name: Install pinned player test client
+      - name: Install the pinned player test client
         run: npm ci --prefix .github/player-tests --ignore-scripts
 
-      - name: Verify production gameplay and restarts
-        run: |
-          source .github/scripts/targets.sh
-          VERSION="$(awk -F= '$1 == "mod_version" {print $2}' gradle.properties)"
-          for target in "${TARGETS[@]}"; do
-            read -r module _ _ <<< "$target"
-            python3 .github/scripts/smoke-test.py "$module" "$(jar_path "$module" "$VERSION")" --player-script .github/player-tests/gameplay.cjs --player-phases first,restart
-          done
-
-      - name: Upload built jars
-        if: success()
-        uses: actions/upload-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
-          name: fiw-admin-tools-jars
-          path: '**/build/libs/*.jar'
-          if-no-files-found: error
+          name: jars
+          path: release
 
-      - name: Read mod version
-        id: version
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          VERSION="$(awk -F= '$1 == "mod_version" { print $2 }' gradle.properties)"
-          if [ -z "$VERSION" ]; then
-            echo "mod_version not found in gradle.properties" >&2
-            exit 1
-          fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
-
-      - name: Check release tag
-        id: release_tag
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          TAG="${{ steps.version.outputs.tag }}"
-          if git tag --list "$TAG" | grep -qx "$TAG"; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "$TAG already exists; skipping publish"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Verify Modrinth secret
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.release_tag.outputs.exists == 'false'
+      - name: Play the production jar and restart the server
         env:
-          MODRINTH_TOKEN: ${{ secrets.MODRINTH_API_KEY }}
-        run: |
-          if [ -z "$MODRINTH_TOKEN" ]; then
-            echo "MODRINTH_API_KEY is required to publish a new version" >&2
-            exit 1
-          fi
+          TARGET: ${{ matrix.target }}
+        run: bash .github/scripts/verify-target.sh "$TARGET" release
 
-      - name: Collect release jars
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.release_tag.outputs.exists == 'false'
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          mkdir -p release
-          jars=(
-            "fabric-26.1.2/build/libs/fiw-admin-tools-fabric-26.1.2-$VERSION.jar"
-            "fabric-1.21.11/build/libs/fiw-admin-tools-fabric-1.21.11-$VERSION.jar"
-            "neoforge-1.21.11/build/libs/fiw-admin-tools-neoforge-1.21.11-$VERSION.jar"
-            "fabric-1.21.8/build/libs/fiw-admin-tools-fabric-1.21.8-$VERSION.jar"
-            "neoforge-1.21.8/build/libs/fiw-admin-tools-neoforge-1.21.8-$VERSION.jar"
-            "fabric-1.21.1/build/libs/fiw-admin-tools-fabric-1.21.1-$VERSION.jar"
-            "neoforge-1.21.1/build/libs/fiw-admin-tools-neoforge-1.21.1-$VERSION.jar"
-            "fabric-1.20.1/build/libs/fiw-admin-tools-fabric-1.20.1-$VERSION.jar"
-            "forge-1.20.1/build/libs/fiw-admin-tools-forge-1.20.1-$VERSION.jar"
-          )
-          for jar in "${jars[@]}"; do
-            test -f "$jar"
-            cp -v "$jar" release/
-          done
-          test "$(find release -name '*.jar' | wc -l)" -eq 9
-          ls -la release
-
-      - name: Extract release notes
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.release_tag.outputs.exists == 'false'
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          awk -v ver="$VERSION" '
-            /^## \[/ { if (p) exit; if ($0 ~ ("^## \\[" ver "\\]")) p=1 }
-            p { print }
-          ' CHANGELOG.md > RELEASE_NOTES.md
-          if [ ! -s RELEASE_NOTES.md ]; then
-            echo "Fiw Admin Tools $VERSION" > RELEASE_NOTES.md
-          fi
-
-      - name: Create release tag
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.release_tag.outputs.exists == 'false'
-        run: |
-          TAG="${{ steps.version.outputs.tag }}"
-          git config user.name "Fi3w0"
-          git config user.email "fi3w0@users.noreply.github.com"
-          git tag -a "$TAG" -m "Release $TAG"
-          git push origin "$TAG"
-
-      - name: Publish GitHub release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.release_tag.outputs.exists == 'false'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          TAG="${{ steps.version.outputs.tag }}"
-          gh release create "$TAG" release/*.jar \
-            --title "Fiw Admin Tools $VERSION" \
-            --notes-file RELEASE_NOTES.md \
-            --verify-tag \
-            --latest
-
-      - name: Publish Modrinth versions and sync description
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.release_tag.outputs.exists == 'false'
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-          MODRINTH_TOKEN: ${{ secrets.MODRINTH_API_KEY }}
-        run: bash .github/scripts/publish-modrinth.sh
-
-      - name: Retain production verification logs
+      - name: Keep server and client logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: production-verification
-          path: build/smoke/**/*.log
+          name: verification-${{ matrix.target }}
+          path: |
+            build/smoke/**/*.log
+            build/smoke/**/snapshots/**
+            build/smoke/**/graves-player-state.json
           if-no-files-found: ignore
           retention-days: 14
