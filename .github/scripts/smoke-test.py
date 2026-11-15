@@ -216,7 +216,9 @@ def main():
     (work / "eula.txt").write_text("eula=true\n")
     (work / "server.properties").write_text(
         f"server-ip=127.0.0.1\nserver-port={port}\nonline-mode=false\nview-distance=2\nsimulation-distance=2\n"
-        "generate-structures=false\nallow-flight=true\npause-when-empty-seconds=-1\nmax-tick-time=-1\n")
+        "generate-structures=false\nallow-flight=true\npause-when-empty-seconds=-1\nmax-tick-time=-1\n"
+        # A fixed world makes every failure reproducible instead of depending on random terrain.
+        "level-seed=fiw-production-verification\n")
     checks = json.loads((ROOT / ".github/boot/smoke.json").read_text())
     commands = checks["commands"] + args.command
     expected = checks["expected"] + args.expect

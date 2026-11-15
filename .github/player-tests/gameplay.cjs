@@ -25,12 +25,42 @@ async function until(condition, description, timeout = 12000) {
     await delay(100)
   }
 }
+// mineflayer waits for a 5x5 chunk square with a fixed 10 s limit. A slow server start or a
+// spawn on a chunk border must not fail the run once the client's own chunk has arrived.
+async function chunksLoaded() {
+  for (let attempt = 0; attempt < 6; attempt++) {
+    try { return await bot.waitForChunksToLoad() } catch (error) {
+      if (bot.world.getColumnAt(bot.entity.position)) return
+    }
+  }
+  throw new Error('Client chunks never loaded')
+}
 async function consoleCommand(command) { emit({ console: command }); await delay(300) }
 async function chat(command, response) {
   const start = messages.length
   bot.chat(command)
   if (response) await until(() => messages.slice(start).some(m => m.includes(response)), command)
   else await delay(300)
+}
+// Builds test terrain only after the server confirms it. Chunks away from the player are not
+// loaded (no spawn chunks on newer versions), and an unverified fill fails silently, leaving the
+// client inside natural terrain of a random world.
+async function build(dimension, [x1, z1, x2, z2], fills) {
+  const scoped = command => `execute in minecraft:${dimension} run ${command}`
+  await consoleCommand(scoped(`forceload add ${x1} ${z1} ${x2} ${z2}`))
+  for (const fill of fills) {
+    const end = Date.now() + 20000
+    for (;;) {
+      const start = messages.length
+      bot.chat('/' + scoped(fill))
+      const done = () => messages.slice(start).some(m => m.includes('Successfully filled') || m.includes('No blocks were filled'))
+      const answered = () => done() || messages.length > start
+      for (let waited = 0; !answered() && waited < 2000; waited += 100) await delay(100)
+      if (done()) break
+      if (Date.now() > end) throw new Error(`Test terrain was not built: ${fill}; ${messages.slice(-5).join('; ')}`)
+      await delay(500)
+    }
+  }
 }
 function patch(relative, changes) {
   const file = path.join(directory, relative)
@@ -45,13 +75,13 @@ const near = x => Math.abs(bot.entity.position.x - x) < 0.15
 async function main() {
   await once(bot, 'spawn')
   bot.physicsEnabled = false
-  await bot.waitForChunksToLoad()
+  await chunksLoaded()
   await consoleCommand(`op ${name}`)
   await consoleCommand('difficulty peaceful')
   await consoleCommand(`gamemode survival ${name}`)
-  await consoleCommand('fill -2 64 -2 10 64 2 minecraft:stone')
-  await consoleCommand('fill -2 65 -2 10 68 2 minecraft:air')
+  await build('overworld', [-2, -2, 10, 2], ['fill -2 64 -2 10 64 2 minecraft:stone', 'fill -2 65 -2 10 68 2 minecraft:air'])
   await consoleCommand(`tp ${name} 0.5 65 0.5`)
+  await until(() => near(0.5) && Math.abs(bot.entity.position.y - 65) < 0.15, 'arrival on the test platform')
   if (clock) {
     patch('world/fiw-clock/config.json', { afk: { enabled: false, minutes: 1 } })
     await consoleCommand('tickwatch reload')
@@ -114,8 +144,7 @@ async function main() {
     patch('config/fiwwarp/config.json', { cross_dimension: false })
     await consoleCommand('fiwwarp reload')
     await consoleCommand(`gamemode creative ${name}`)
-    await consoleCommand('execute in minecraft:the_nether run fill 7 119 -1 10 119 2 minecraft:stone')
-    await consoleCommand('execute in minecraft:the_nether run fill 7 120 -1 10 123 2 minecraft:air')
+    await build('the_nether', [7, -1, 10, 2], ['fill 7 119 -1 10 119 2 minecraft:stone', 'fill 7 120 -1 10 123 2 minecraft:air'])
     await consoleCommand(`execute in minecraft:the_nether run tp ${name} 8.5 120 0.5`)
     await consoleCommand(`execute as ${name} at @s if dimension minecraft:the_nether run tellraw ${name} {"text":"QA_NETHER"}`)
     await until(() => messages.some(m => m.includes('QA_NETHER')), 'server confirmed nether transition')
