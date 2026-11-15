@@ -1,0 +1,11 @@
+{
+  "commands": [
+    "fiw reload",
+    "fiw status",
+    "fiw afk list"
+  ],
+  "expected": [
+    "Reloaded fiw admin tools config.",
+    "AFK:"
+  ]
+}
