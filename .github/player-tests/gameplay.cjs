@@ -101,10 +101,14 @@ async function main() {
       assert(seen(), `block at 1 65 0 is ${type}`)
     }
     const target = () => bot.blockAt(bot.entity.position.offset(1, 0, 0).floored())
-    const dig = () => bot.dig(target(), true).catch(() => {})
     await consoleCommand('setblock 1 65 0 minecraft:torch')
     await blockIs('torch', 'QA_BLOCK_PLACED')
     await until(() => target()?.name === 'torch', 'client sees the test block')
+    // The server is the judge. This client never rolls a refused break back on its own (a real
+    // client does, on the server's acknowledgement), so it digs the block it saw at the start
+    // and does not wait for its own view to change.
+    const torch = target()
+    const dig = async () => { bot.dig(torch, true).catch(() => {}); await delay(1000) }
     const toggleFreeze = async reply => {
       const start = messages.length
       await consoleCommand(`fiw freeze ${name}`)
@@ -112,9 +116,7 @@ async function main() {
     }
     await toggleFreeze('You have been frozen')
     await dig()
-    await delay(1000)
     await blockIs('torch', 'QA_BLOCK_KEPT')
-    await until(() => target()?.name === 'torch', 'client sees the block again after the refused break')
     await toggleFreeze('You have been unfrozen')
     await dig()
     await blockIs('air', 'QA_BLOCK_BROKEN')
