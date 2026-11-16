@@ -6,7 +6,7 @@
 
 [![Build](https://github.com/Fi3w0/fiw-admin-utilitys/actions/workflows/build.yml/badge.svg)](https://github.com/Fi3w0/fiw-admin-utilitys/actions/workflows/build.yml)
 [![Modrinth](https://img.shields.io/modrinth/dt/fiw-admin-utilitys?logo=modrinth&label=Modrinth)](https://modrinth.com/mod/fiw-admin-utilitys)
-[![Minecraft](https://img.shields.io/badge/Minecraft-1.20.1%20%7C%201.21.1%20%7C%201.21.8%20%7C%201.21.11-62b47a)](#supported-versions)
+[![Minecraft](https://img.shields.io/badge/Minecraft-1.20.1%20%7C%201.21.1%20%7C%201.21.8%20%7C%201.21.11%20%7C%2026.1.2%20%7C%2026.3-62b47a)](#supported-versions)
 [![Loaders](https://img.shields.io/badge/Loaders-Fabric%20%7C%20NeoForge%20%7C%20Forge-8a63d2)](#supported-versions)
 [![License](https://img.shields.io/badge/License-All%20Rights%20Reserved-red)](LICENSE)
 
@@ -49,13 +49,13 @@ This mod is **server-side only**. Vanilla clients can join normally.
 | 26.3 | NeoForge | 26.3.0.103 | 25 | `fiw-admin-tools-neoforge-26.3-<version>.jar` |
 | 26.1.2 | Fabric | Loader 0.19.3, Fabric API 0.148.0 | 25 | `fiw-admin-tools-fabric-26.1.2-<version>.jar` |
 | 26.1.2 | NeoForge | 26.1.2.126 | 25 | `fiw-admin-tools-neoforge-26.1.2-<version>.jar` |
-| 1.21.11 | Fabric | Loader 0.19.2, Fabric API 0.141.4 | 21 | `fiw-admin-tools-fabric-1.21.11-<version>.jar` |
+| 1.21.11 | Fabric | Loader 0.19.3, Fabric API 0.141.4 | 21 | `fiw-admin-tools-fabric-1.21.11-<version>.jar` |
 | 1.21.11 | NeoForge | 21.11.45 | 21 | `fiw-admin-tools-neoforge-1.21.11-<version>.jar` |
-| 1.21.8 | Fabric | Loader 0.19.2, Fabric API 0.130.0 | 21 | `fiw-admin-tools-fabric-1.21.8-<version>.jar` |
+| 1.21.8 | Fabric | Loader 0.19.3, Fabric API 0.130.0 | 21 | `fiw-admin-tools-fabric-1.21.8-<version>.jar` |
 | 1.21.8 | NeoForge | 21.8.53 | 21 | `fiw-admin-tools-neoforge-1.21.8-<version>.jar` |
-| 1.21.1 | Fabric | Loader 0.19.2, Fabric API 0.115.0 | 21 | `fiw-admin-tools-fabric-1.21.1-<version>.jar` |
-| 1.21.1 | NeoForge | 21.1.227 | 21 | `fiw-admin-tools-neoforge-1.21.1-<version>.jar` |
-| 1.20.1 | Fabric | Loader 0.16.14, Fabric API 0.92.2 | 17 | `fiw-admin-tools-fabric-1.20.1-<version>.jar` |
+| 1.21.1 | Fabric | Loader 0.19.3, Fabric API 0.115.0 | 21 | `fiw-admin-tools-fabric-1.21.1-<version>.jar` |
+| 1.21.1 | NeoForge | 21.1.248 | 21 | `fiw-admin-tools-neoforge-1.21.1-<version>.jar` |
+| 1.20.1 | Fabric | Loader 0.19.3, Fabric API 0.92.2 | 17 | `fiw-admin-tools-fabric-1.20.1-<version>.jar` |
 | 1.20.1 | Forge | 47.3.0 | 17 | `fiw-admin-tools-forge-1.20.1-<version>.jar` |
 
 NeoForge does not have a maintained 1.20.1 release line, so Minecraft 1.20.1 uses Forge. Every target uses the official Mojang mappings for its exact Minecraft version.
@@ -205,10 +205,3 @@ The project keeps Minecraft-independent configuration and state logic in `core`,
 ## License
 
 Copyright © Fi3w0. All rights reserved. See [LICENSE](LICENSE).
-
-
-### Automated gameplay checks
-
-With Node 22+ installed, run `./gradlew playerTest -PsmokeTarget=<module>` to test the built
-production jar in a disposable local server, then repeat after a restart. CI runs this check
-for every target and retains logs on failure. Minecraft 26.3 gets the startup and console checks only until the test client supports it. Output is under `build/smoke/<module>`.

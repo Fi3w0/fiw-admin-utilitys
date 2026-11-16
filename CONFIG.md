@@ -87,7 +87,7 @@ Files not listed here (`alert-history.json`, `vanished-players.json`, `player-se
 | `hideFromTab` | `true` | Hide vanished players from the tab list for non-`seePermission` viewers. |
 | `hideEntity` | `true` | Hide the vanished player's entity model from non-`seePermission` viewers. |
 | `hideFromServerListCount` | `true` | Exclude vanished players from the server-list player count/sample. |
-| `hideFromLocatorBar` | `true` | Hide vanished players from the locator bar/waypoint system (1.21.8+/1.21.11 only — see [Known limitations](README.md#known-limitations)). |
+| `hideFromLocatorBar` | `true` | Hide vanished players from the locator bar/waypoint system (1.21.8 and newer only — see [Known limitations](README.md#known-limitations)). |
 | `vanishedPrefix` | `"[V] "` | Prefix shown before a vanished player's own name to `seePermission` viewers (e.g. in tab list). |
 
 ## inspect.json
