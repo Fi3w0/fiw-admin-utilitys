@@ -6,7 +6,6 @@
 - Fabric and NeoForge 26.3 and 26.1.2 (Java 25), completing twelve loader/version targets.
 - Shared AFK state with Tickwatch 1.2.0+: configure one timeout in `afk.json`, and manual AFK,
   tags, auto-kick and time accounting agree. Both mods remain optional to one another.
-- Production-jar boot, connected-client AFK, console-command and restart checks before automatic publishing.
 
 ### Fixed
 - Forge/NeoForge honor each command's fallback operator level, including AFK listing at level 2.
