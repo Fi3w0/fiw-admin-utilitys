@@ -89,16 +89,22 @@ async function main() {
     await chat('/tickwatch stats', `Joins: ${phase.includes('restart') ? 2 : 1}`)
   }
   if (admin) {
-    // A frozen player cannot break blocks; once unfrozen the same block breaks.
+    // A frozen player cannot break blocks; once unfrozen the same block breaks. A torch breaks
+    // instantly, so the result does not depend on how long the server thinks a dig takes.
     const blockIs = async (type, marker) => {
       const start = messages.length
-      await consoleCommand(`execute if block 1 65 0 minecraft:${type} run tellraw ${name} {"text":"${marker}"}`)
-      await until(() => messages.slice(start).some(m => m.includes(marker)), `block at 1 65 0 is ${type}`)
+      const seen = () => messages.slice(start).some(m => m.includes(marker))
+      for (let attempt = 0; attempt < 20 && !seen(); attempt++) {
+        await consoleCommand(`execute if block 1 65 0 minecraft:${type} run tellraw ${name} {"text":"${marker}"}`)
+        await delay(300)
+      }
+      assert(seen(), `block at 1 65 0 is ${type}`)
     }
-    const dig = () => bot.dig(bot.blockAt(bot.entity.position.offset(1, 0, 0).floored()), true).catch(() => {})
-    await consoleCommand('setblock 1 65 0 minecraft:dirt')
-    await blockIs('dirt', 'QA_BLOCK_PLACED')
-    await until(() => bot.blockAt(bot.entity.position.offset(1, 0, 0).floored())?.name === 'dirt', 'client sees the test block')
+    const target = () => bot.blockAt(bot.entity.position.offset(1, 0, 0).floored())
+    const dig = () => bot.dig(target(), true).catch(() => {})
+    await consoleCommand('setblock 1 65 0 minecraft:torch')
+    await blockIs('torch', 'QA_BLOCK_PLACED')
+    await until(() => target()?.name === 'torch', 'client sees the test block')
     const toggleFreeze = async reply => {
       const start = messages.length
       await consoleCommand(`fiw freeze ${name}`)
@@ -106,8 +112,9 @@ async function main() {
     }
     await toggleFreeze('You have been frozen')
     await dig()
-    await delay(500)
-    await blockIs('dirt', 'QA_BLOCK_KEPT')
+    await delay(1000)
+    await blockIs('torch', 'QA_BLOCK_KEPT')
+    await until(() => target()?.name === 'torch', 'client sees the block again after the refused break')
     await toggleFreeze('You have been unfrozen')
     await dig()
     await blockIs('air', 'QA_BLOCK_BROKEN')
