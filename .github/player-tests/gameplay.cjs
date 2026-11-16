@@ -89,6 +89,29 @@ async function main() {
     await chat('/tickwatch stats', `Joins: ${phase.includes('restart') ? 2 : 1}`)
   }
   if (admin) {
+    // A frozen player cannot break blocks; once unfrozen the same block breaks.
+    const blockIs = async (type, marker) => {
+      const start = messages.length
+      await consoleCommand(`execute if block 1 65 0 minecraft:${type} run tellraw ${name} {"text":"${marker}"}`)
+      await until(() => messages.slice(start).some(m => m.includes(marker)), `block at 1 65 0 is ${type}`)
+    }
+    const dig = () => bot.dig(bot.blockAt(bot.entity.position.offset(1, 0, 0).floored()), true).catch(() => {})
+    await consoleCommand('setblock 1 65 0 minecraft:dirt')
+    await blockIs('dirt', 'QA_BLOCK_PLACED')
+    await until(() => bot.blockAt(bot.entity.position.offset(1, 0, 0).floored())?.name === 'dirt', 'client sees the test block')
+    const toggleFreeze = async reply => {
+      const start = messages.length
+      await consoleCommand(`fiw freeze ${name}`)
+      await until(() => messages.slice(start).some(m => m.includes(reply)), `freeze toggle: ${reply}`)
+    }
+    await toggleFreeze('You have been frozen')
+    await dig()
+    await delay(500)
+    await blockIs('dirt', 'QA_BLOCK_KEPT')
+    await toggleFreeze('You have been unfrozen')
+    await dig()
+    await blockIs('air', 'QA_BLOCK_BROKEN')
+    emit({ assertion: 'a frozen player cannot break a block; after unfreezing the same block breaks' })
     patch('config/fiw-admin/afk.json', { enabled: true, idleThresholdSeconds: 600, kickAfterSeconds: 0 })
     await consoleCommand('fiw reload')
     await chat('/fiw afk', 'You are now marked AFK.')
