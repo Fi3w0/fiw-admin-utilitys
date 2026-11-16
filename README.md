@@ -46,6 +46,7 @@ This mod is **server-side only**. Vanilla clients can join normally.
 | Minecraft | Loader | Minimum loader/API | Java | Release jar |
 |---|---|---|---:|---|
 | 26.1.2 | Fabric | Loader 0.19.3, Fabric API 0.148.0 | 25 | `fiw-admin-tools-fabric-26.1.2-<version>.jar` |
+| 26.1.2 | NeoForge | 26.1.2.126 | 25 | `fiw-admin-tools-neoforge-26.1.2-<version>.jar` |
 | 1.21.11 | Fabric | Loader 0.19.2, Fabric API 0.141.4 | 21 | `fiw-admin-tools-fabric-1.21.11-<version>.jar` |
 | 1.21.11 | NeoForge | 21.11.45 | 21 | `fiw-admin-tools-neoforge-1.21.11-<version>.jar` |
 | 1.21.8 | Fabric | Loader 0.19.2, Fabric API 0.130.0 | 21 | `fiw-admin-tools-fabric-1.21.8-<version>.jar` |
@@ -188,7 +189,7 @@ The Gradle runtime uses JDK 25 and resolves Java 17, 21 and 25 for the matching 
 ./gradlew build
 ```
 
-That command runs the shared tests and creates all nine release jars. Individual targets can be built with tasks such as `./gradlew :fabric-1.21.1:build` or `./gradlew :forge-1.20.1:build`.
+That command runs the shared tests and creates all ten release jars. Individual targets can be built with tasks such as `./gradlew :fabric-1.21.1:build` or `./gradlew :forge-1.20.1:build`.
 
 The project keeps Minecraft-independent configuration and state logic in `core`, exact-version Minecraft integrations in `common-*`, and loader entrypoints in `fabric-*`, `neoforge-*`, and `forge-*`.
 
@@ -208,4 +209,4 @@ Copyright © Fi3w0. All rights reserved. See [LICENSE](LICENSE).
 
 With Node 22+ installed, run `./gradlew playerTest -PsmokeTarget=<module>` to test the built
 production jar in a disposable local server, then repeat after a restart. CI runs this check
-for all nine targets and retains logs on failure. Output is under `build/smoke/<module>`.
+for all ten targets and retains logs on failure. Output is under `build/smoke/<module>`.
