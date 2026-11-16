@@ -12,6 +12,10 @@ body:
     attributes:
       label: Loader and Minecraft version
       options:
+        - Fabric 26.3
+        - NeoForge 26.3
+        - Fabric 26.1.2
+        - NeoForge 26.1.2
         - Fabric 1.21.11
         - NeoForge 1.21.11
         - Fabric 1.21.8
@@ -27,7 +31,7 @@ body:
     id: mod_version
     attributes:
       label: Fiw Admin Tools version
-      placeholder: "1.1.0"
+      placeholder: "1.4.0"
     validations:
       required: true
 
@@ -35,7 +39,7 @@ body:
     id: loader_version
     attributes:
       label: Loader and API versions
-      placeholder: "Fabric Loader 0.19.2 + Fabric API 0.141.4, or NeoForge 21.8.53"
+      placeholder: "Fabric Loader 0.19.3 + Fabric API 0.141.4, or NeoForge 21.8.53"
 
   - type: textarea
     id: what_happened
