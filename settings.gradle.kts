@@ -33,6 +33,7 @@ rootProject.name = "fiw-admin-tools"
 
 include("core")
 include("fabric-26.1.2")
+include("neoforge-26.1.2")
 include("fabric-1.21.11")
 include("neoforge-1.21.11")
 include("fabric-1.21.8")
