@@ -20,6 +20,7 @@ All tools live under the `/fiw` command tree. LuckPerms is supported, with loade
 
 | Minecraft | Loaders |
 |---|---|
+| 26.3 | Fabric, NeoForge (Java 25) |
 | 26.1.2 | Fabric, NeoForge (Java 25) |
 | 1.21.11 | Fabric, NeoForge |
 | 1.21.8 | Fabric, NeoForge |

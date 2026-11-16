@@ -8,9 +8,10 @@
 
 ## Supported targets
 
-Every behavior change must keep parity across all ten release jars:
+Every behavior change must keep parity across all twelve release jars:
 
 ```text
+Fabric 26.3        NeoForge 26.3
 Fabric 26.1.2      NeoForge 26.1.2
 Fabric 1.21.11     NeoForge 1.21.11
 Fabric 1.21.8      NeoForge 1.21.8

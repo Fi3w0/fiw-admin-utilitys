@@ -2,17 +2,18 @@
 
 ## Current foundation
 
-Version 1.1.0 keeps the complete existing feature set across ten server-side builds:
+Version 1.1.0 keeps the complete existing feature set across twelve server-side builds:
 
 | Minecraft | Fabric | NeoForge | Forge |
 |---|:---:|:---:|:---:|
+| 26.3 | Yes | Yes | — |
 | 26.1.2 | Yes | Yes | — |
 | 1.21.11 | Yes | Yes | — |
 | 1.21.8 | Yes | Yes | — |
 | 1.21.1 | Yes | Yes | — |
 | 1.20.1 | Yes | — | Yes |
 
-The project uses one Minecraft-independent `core`, an exact-version `common-*` integration for official Mojang-mapped APIs, and thin loader adapters. A single root version produces all ten jars. GitHub Actions builds the matrix, creates version tags and GitHub releases, publishes each loader/version file to Modrinth project `f1yH9Ggq`, and synchronizes `MODRINTH.md`.
+The project uses one Minecraft-independent `core`, an exact-version `common-*` integration for official Mojang-mapped APIs, and thin loader adapters. A single root version produces all twelve jars. GitHub Actions builds the matrix, creates version tags and GitHub releases, publishes each loader/version file to Modrinth project `f1yH9Ggq`, and synchronizes `MODRINTH.md`.
 
 ## Existing modules
 
@@ -35,6 +36,6 @@ The project uses one Minecraft-independent `core`, an exact-version `common-*` i
 
 Phase B (watchdog + dupe detection) shipped. No further work is queued — potential next features belong in the GitHub feature-request form so scope, permissions, configuration, loader parity, and acceptance criteria can be agreed before implementation.
 
-Further gameplay/admin functionality should preserve command/config compatibility and ship across all ten targets unless a Minecraft API does not exist on an older version.
+Further gameplay/admin functionality should preserve command/config compatibility and ship across all twelve targets unless a Minecraft API does not exist on an older version.
 
 Potential requests belong in the GitHub feature-request form so scope, permissions, configuration, loader parity, and acceptance criteria can be agreed before implementation.
