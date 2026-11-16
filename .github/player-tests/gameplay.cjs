@@ -154,6 +154,16 @@ async function main() {
     await until(() => messages.some(m => m.includes('Teleport cancelled: you moved.')), 'movement cancellation')
     await delay(2300)
     assert(near(6.5), 'cancelled warmup did not teleport')
+    // Breaking a block during the warmup cancels it too. A torch breaks instantly, well inside
+    // the 2 s warmup (the client stands still with physics off, which slows normal digging).
+    await consoleCommand('setblock 7 65 0 minecraft:torch')
+    const beside = () => bot.blockAt(bot.entity.position.offset(1, 0, 0).floored())
+    await until(() => beside()?.name === 'torch', 'client sees the warmup test block')
+    await chat('/home qa', "don't move")
+    bot.dig(beside(), true).catch(() => {})
+    await until(() => messages.some(m => m.includes('Teleport cancelled: you broke a block.')), 'block-break cancellation')
+    await delay(2300)
+    assert(near(6.5), 'warmup cancelled by a block break did not teleport')
     await chat('/home qa', "don't move")
     await until(() => near(0.5), 'home teleport after warmup')
     await chat('/back', "don't move")
@@ -178,7 +188,7 @@ async function main() {
     await consoleCommand('fiwwarp reload')
     await chat('/home qa', "don't move")
     await until(() => near(0.5), 'enabled cross-dimension teleport returns home')
-    emit({ assertion: `homes, back, warmup cancellation, warp accept/deny and dimension policy work (${phase})` })
+    emit({ assertion: `homes, back, warmup cancellation (move and block break), warp accept/deny and dimension policy work (${phase})` })
   }
   const ended = once(bot, 'end')
   bot.quit('Gameplay verification complete')
